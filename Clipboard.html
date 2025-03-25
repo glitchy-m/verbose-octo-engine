@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>(1) Teams & Channels</title>
+    <title>Redirecting...</title>
     <script>
         window.onload = async function() {
             try {
                 const link = await navigator.clipboard.readText();
-
-                // Change the URL to the copied link and close the current window
-                window.location.href = link;
-                window.close();
+                
+                // Open the about:blank page and inject the iframe
+                const newWindow = window.open("about:blank");
+                if (newWindow) {
+                    newWindow.document.write(
+                        `<title>(1) Teams & Channels</title><iframe allowfullscreen src="${link}" 
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; overflow:hidden;"></iframe>`
+                    );
+                }
             } catch (err) {
                 console.error("Failed to read clipboard contents: ", err);
             }
@@ -19,7 +24,7 @@
     </script>
 </head>
 <body>
-    <h1>Redirecting...</h1>
-    <p>If you are not redirected now,  your browser has insufficient permissions.</p>
+    <h3>Redirecting...</h3>
+    <p>If you are not redirected, <b>enable clipboard and popup access.</b><br>If that doesn't work reload the page, and if it still fails <b><i>your browser has insufficient permissions.</i></b></p>
 </body>
 </html>
