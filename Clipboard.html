@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>(1) Teams & Channels</title>
+    <script>
+        window.onload = async function() {
+            try {
+                const link = await navigator.clipboard.readText();
+                
+                // Open the about:blank page and inject the iframe
+                const newWindow = window.open("about:blank");
+                if (newWindow) {
+                    newWindow.document.write(
+                        `<iframe allowfullscreen src="${link}" 
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; overflow:hidden;"></iframe>`
+                    );
+                }
+            } catch (err) {
+                console.error("Failed to read clipboard contents: ", err);
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>Redirecting...</h1>
+    <p>If this doesn't work, you either have nothing in your clipboard or your browser has insufficient permissions.</p>
+</body>
+</html>
