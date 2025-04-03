@@ -1,9 +1,51 @@
-<style>
-    body {
-        font-family: "Verdana";
-    }
-</style>
-<title>Sorry, this website has been taken down.</title>
-<h1 style="color: DarkRed;">Sorry, this website has been taken down.</h1>
-<p><b>Don't play games during school hours.</b><br>This website and other related websites have already been shut down or replaced by pages like this.<br><i>Trash Trove!</i> and <i>Temple of the Stars</i> will soon be shutdown.<br>Thanks for viewing my website. Sites like these will never return.</p>
-<button onclick="window.close()">..do something better, if you have time.</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting...</title>
+    <script>
+        function showError() {
+            document.body.innerHTML = `<h1 style="color: DarkRed;">Redirect failed!</h1>
+                                       <a>The link you copied is probably invalid. Please copy a valid URL that is redirectable and try again.</a><br>If you are <b>still</b> not redirected, try turning on clipboard and notification permissions (in the top left + right corner) then reload the page.<br>If nothing works, contact me.`;
+        }
+
+        window.onload = async function() {
+            try {
+                const link = await navigator.clipboard.readText();
+                try {
+                    new URL(link);
+                } catch (_) {
+                    showError();
+                    return;
+                }
+
+                const newWindow = window.open("about:blank");
+                if (newWindow) {
+                    newWindow.document.write(
+                        `<title>(1) Teams & Channels</title><iframe allowfullscreen src="${link}" 
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; overflow:hidden;"></iframe>`
+                    );
+                    
+                    setTimeout(() => {
+                        if (!newWindow.document.body || newWindow.document.body.innerHTML === "") {
+                            newWindow.close();
+                            showError();
+                        }
+                    }, 2000);
+                } else {
+                    showError();
+                }
+            } catch (err) {
+                console.error("Failed to read clipboard contents: ", err);
+                showError();
+            }
+        };
+    </script>
+</head>
+<body>
+    <h3>Redirecting...</h3>
+    <p>If you are not redirected, <b>enable clipboard and popup access.</b><br>
+    If that doesn't work reload the page, and if it still fails <b><i>your browser has insufficient permissions.</i></b></p>
+</body>
+</html>
