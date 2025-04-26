@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bible Verse Fetcher</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      color: cyan;
+      font-family: Helvetica, Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    #verse {
+      font-size: 48px;
+      word-wrap: break-word;
+      max-width: 1500px;
+    }
+
+    .superscript {
+      color: yellow;
+    }
+
+    #reference {
+      font-size: 24px;
+      color: gray;
+      margin-top: 20px;
+    }
+
+    #inputBox {
+      display: none;
+      margin-top: 20px;
+    }
+
+    input {
+      padding: 10px;
+      font-size: 18px;
+    }
+
+    button {
+      padding: 10px;
+      font-size: 18px;
+      background-color: cyan;
+      color: black;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="verse">Click anywhere to enter a Bible verse...</div>
+  <div id="reference"></div>
+
+  <!-- Input Box -->
+  <div id="inputBox">
+    <input type="text" id="referenceInput" placeholder="Enter Bible verse (e.g., John 3:16)">
+    <button onclick="fetchVerse()">Fetch Verse</button>
+  </div>
+
+  <script>
+    const SUPERSCRIPTS = {
+      0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵',
+      6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹'
+    };
+
+    function numberToSuperscript(n) {
+      return n.split('').map(digit => SUPERSCRIPTS[digit] || '').join('');
+    }
+
+    async function fetchVerse() {
+      const reference = document.getElementById('referenceInput').value;
+      if (!reference) return;
+
+      const url = `https://bible-api.com/${reference.replace(' ', '%20')}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!data.verses || data.verses.length === 0) {
+        document.getElementById('verse').textContent = 'Error fetching verse.';
+        document.getElementById('reference').textContent = '';
+        return;
+      }
+
+      let verseText = '';
+      let start = data.verses[0];
+      let end = data.verses[data.verses.length - 1];
+      
+      data.verses.forEach(v => {
+        const superscript = numberToSuperscript(v.verse.toString());
+        verseText += `<span class="superscript">${superscript}</span>${v.text} `;
+      });
+
+      document.getElementById('verse').innerHTML = verseText.trim();
+
+      if (start.book_name === end.book_name && start.chapter === end.chapter) {
+        document.getElementById('reference').textContent = `— ${start.book_name} ${start.chapter}:${start.verse}-${end.verse}`;
+      } else {
+        document.getElementById('reference').textContent = `— ${start.book_name} ${start.chapter}:${start.verse} to ${end.book_name} ${end.chapter}:${end.verse}`;
+      }
+      
+      // Hide input box and display result
+      document.getElementById('inputBox').style.display = 'none';
+    }
+
+    document.body.addEventListener('click', () => {
+      // Show input box to get verse reference
+      document.getElementById('inputBox').style.display = 'block';
+    });
+  </script>
+</body>
+</html>
