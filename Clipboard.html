@@ -1,53 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" type="image/jpg" href="favicon.ico"/>
-    <title>Redirecting...</title>
-    <script>
-        function showError() {
-            document.body.innerHTML = `<h1 style="color: DarkRed;">Redirect failed!</h1>
-                                       <button onclick="window.location.reload();">Refresh</button> <br> <br>
-                                       <a>The link you copied is probably invalid. Please copy a valid URL that is redirectable and try again.</a><br>If you are <b>still</b> not redirected, try turning on clipboard and notification permissions (in the top left + right corner) then reload the page.<br>If nothing works, contact me.`;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Redirecting...</title>
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon"/>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f9fafe;
+      color: #111;
+    }
 
-        window.onload = async function() {
-            try {
-                const link = await navigator.clipboard.readText();
-                try {
-                    new URL(link);
-                } catch (_) {
-                    showError();
-                    return;
-                }
+    header {
+      background: #2563eb;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
 
-                const newWindow = window.open("about:blank");
-                if (newWindow) {
-                    newWindow.document.write(
-                        `<title>(1) Teams & Channels</title><iframe allowfullscreen src="${link}" 
-                        style="position:absolute; top:0; left:0; width:100%; height:100%; border:none; overflow:hidden;"></iframe>`
-                    );
-                    
-                    setTimeout(() => {
-                        if (!newWindow.document.body || newWindow.document.body.innerHTML === "") {
-                            newWindow.close();
-                            showError();
-                        }
-                    }, 2000);
-                } else {
-                    showError();
-                }
-            } catch (err) {
-                console.error("Failed to read clipboard contents: ", err);
-                showError();
-            }
-        };
-    </script>
+    .card {
+      background: white;
+      border-radius: 1rem;
+      padding: 1.2rem;
+      margin: 1rem auto;
+      max-width: 800px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    .card h2 {
+      color: #1d4ed8;
+      margin-top: 0;
+    }
+
+    .card a {
+      text-decoration: none;
+      color: #2563eb;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      color: white;
+      background: #1e3a8a;
+    }
+  </style>
 </head>
 <body>
+  <div id="fallback-root" style="display: none;">
+    <header>
+      <h1>Itz'at STEAM Academy (ISA)</h1>
+      <p>Top Educational Resources</p>
+    </header>
+    <main id="root"></main>
+    <footer>&copy; 2025 ISA • Keep learning smart, not sneaky.</footer>
+  </div>
+
+  <div id="loading">
     <h3>Redirecting...</h3>
-    <p>If you are not redirected, <b>enable clipboard and popup access.</b><br>
-    If that doesn't work reload the page, and if it still fails <b><i>your browser has insufficient permissions.</i></b></p>
+    <p>If you're not redirected, make sure <b>clipboard and popup access</b> are allowed.<br>
+    Otherwise, you'll see the fallback content.</p>
+  </div>
+
+  <script type="text/babel">
+    const resources = [
+      { name: "Khan Academy", description: "Free world-class education in math, science, and more.", url: "https://www.khanacademy.org/" },
+      { name: "Scratch", description: "Learn to code with block-based programming.", url: "https://scratch.mit.edu/" },
+      { name: "NASA STEM", description: "STEM activities straight from NASA.", url: "https://www.nasa.gov/stem" },
+      { name: "Codecademy", description: "Interactive programming lessons.", url: "https://www.codecademy.com/" },
+      { name: "PhET Simulations", description: "Interactive science & math experiments.", url: "https://phet.colorado.edu/" },
+      { name: "TED-Ed", description: "Animated lessons on all kinds of topics.", url: "https://ed.ted.com/" },
+      { name: "NatGeo Kids", description: "Explore animals, science, and geography.", url: "https://kids.nationalgeographic.com/" },
+      { name: "Replit", description: "Online coding IDE with multiplayer support.", url: "https://replit.com/" },
+      { name: "Google Arts & Culture", description: "Explore museums and art from around the world.", url: "https://artsandculture.google.com/" }
+    ];
+
+    function App() {
+      return (
+        <div>
+          {resources.map((res, i) => (
+            <div className="card" key={i}>
+              <h2>{res.name}</h2>
+              <p>{res.description}</p>
+              <a href={res.url} target="_blank" rel="noopener noreferrer">Visit {res.name}</a>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function showFallbackSite() {
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("fallback-root").style.display = "block";
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    }
+
+    async function tryRedirect() {
+      try {
+        const link = await navigator.clipboard.readText();
+        if (!/^https?:\/\//.test(link)) throw new Error("Invalid URL format");
+
+        const popup = window.open("about:blank");
+        if (!popup) throw new Error("Popup blocked");
+
+        popup.document.write(
+          `<title>Opening...</title><iframe src="${link}" style="position:fixed;top:0;left:0;width:100%;height:100%;border:none;"></iframe>`
+        );
+
+        setTimeout(() => {
+          try {
+            if (!popup.document.body || popup.document.body.innerHTML.trim() === "") {
+              popup.close();
+              showFallbackSite();
+            }
+          } catch {
+            popup.close();
+            showFallbackSite();
+          }
+        }, 2000);
+      } catch (err) {
+        console.warn("Redirect failed, showing fallback:", err.message);
+        showFallbackSite();
+      }
+    }
+
+    window.onload = tryRedirect;
+  </script>
 </body>
 </html>
