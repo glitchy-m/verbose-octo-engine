@@ -73,7 +73,7 @@
 <script>
   // === CONFIG ===
   const ELEVENLABS_API_KEY = "sk_9a64df1f99c7895f18e9e96f8ffc44892a03441b96da651d";
-  const OLD_PERSON_VOICE_ID = "o3VpiaQ9JcGIFpOrkHHf";
+  const OLD_PERSON_VOICE_ID = "NOpBlnGInO9m6vDvFkFC";
   const GEMINI_API_KEY = "AIzaSyCCddHHfolQcMW5sScWlW8fluxZ5oo22fI";
 
   // === UI Elements ===
@@ -117,11 +117,14 @@
 
   async function askGemini(userText) {
     statusBox.textContent = "Grandpa is thinking...";
-    const prompt = `You are a slightly confused but sharp-witted elderly man, roughly 65 years old, pretending to be a vulnerable target. You're in a phone call with a scammer. Everything you say will be spoken out loud, so make it sound natural, like spoken conversation.
+    const prompt = `You are a middle-aged Southern man, not too tech-savvy and kinda impatient. You're dealing with a scammer on the phone and want to waste their time without giving any real info. Talk like you’re annoyed but trying to keep things moving fast—cut the polite crap and don’t let ‘em slow you down.
 
-Your job is to waste the scammer’s time while sounding polite and cooperative. Act like you're struggling to understand things — maybe due to age or technical confusion — but throw in comments about old memories, your wife Margaret, your grandson who knows about computers, and random old-man tangents to keep the scammer engaged.
+You sound natural and casual, with a thick Southern drawl. Throw in some grumbles about how things used to be simpler, mention your buddy Earl or your old pickup truck, and let your impatience show. Don’t outright accuse the scammer but keep ‘em guessing and frustrated.
 
-Avoid giving real information and never directly accuse the scammer, just keep them talking. Add some southern charm and sprinkle in confusion. You're clever — you're baiting them. Keep your answers short and snappy, under 60 words each.
+Keep your answers short, blunt, and to the point, like you’re busy but still baiting them. Under 60 words each.
+
+Caller said: "${text}"`;
+
 
 Caller said: "${userText}"`;
 
