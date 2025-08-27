@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>screen audio visualizer — share tab audio</title>
+<title>tab audio visualizer — share tab only</title>
 <style>
   :root{--bg:#0b0f14;--panel:#0f1720;--muted:#9aa7b2;--accent:#34d399;--glass:rgba(255,255,255,0.035)}
   html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#dfe7ea;background:linear-gradient(180deg,#02050a 0%, #07101a 100%);}
@@ -34,13 +34,13 @@
 <div class="wrap">
   <aside class="panel">
     <header>
-      <h1>screen audio visualizer</h1>
-      <p>share a tab or your screen, allow audio, then pick a visualizer. works in chromium-based browsers that support "share tab audio" (check the "share audio" box when choosing a tab).</p>
+      <h1>tab audio visualizer</h1>
+      <p>only allows sharing a single tab with audio. click "share tab audio" and make sure you check "share audio" when selecting a tab.</p>
     </header>
 
     <div class="controls">
       <div class="top-row">
-        <button id="shareBtn">share audio</button>
+        <button id="shareBtn">share tab audio</button>
         <button id="stopBtn" class="ghost">stop</button>
       </div>
 
@@ -65,15 +65,15 @@
       </div>
 
       <div class="note">
-        <strong>how to get tab audio</strong>
+        <strong>instructions:</strong>
         <ol style="padding-left:18px;margin:8px 0 0;color:var(--muted)">
-          <li>click "share audio".</li>
-          <li>choose "tab" in the picker, check "share audio", then click share.</li>
+          <li>click "share tab audio".</li>
+          <li>choose a single tab in the picker and check "share audio".</li>
           <li>play audio in that tab, the visualizer will respond.</li>
         </ol>
       </div>
 
-      <div class="footer small">built-in visualizers: bars, radial, waveform, particles, spectrogram. plus classic oscilloscope (preexisting style). enjoy!! ;)</div>
+      <div class="footer small">visualizers: bars, radial, waveform, particles, spectrogram, oscilloscope</div>
     </div>
   </aside>
 
@@ -83,7 +83,6 @@
 </div>
 
 <script>
-// single-file audio visualizer with multiple modes
 const shareBtn = document.getElementById('shareBtn');
 const stopBtn = document.getElementById('stopBtn');
 const visList = document.getElementById('visList');
@@ -97,295 +96,49 @@ const densityVal = document.getElementById('densityVal');
 const canvas = document.getElementById('visCanvas');
 const ctx = canvas.getContext('2d');
 let W=0,H=0;
-function resize(){
-  canvas.width = Math.floor(canvas.clientWidth * devicePixelRatio);
-  canvas.height = Math.floor(canvas.clientHeight * devicePixelRatio);
-  W = canvas.width; H = canvas.height;
-}
-window.addEventListener('resize', () => { resize(); });
+function resize(){ canvas.width = Math.floor(canvas.clientWidth * devicePixelRatio); canvas.height = Math.floor(canvas.clientHeight * devicePixelRatio); W = canvas.width; H = canvas.height; }
+window.addEventListener('resize', resize);
 resize();
 
-let audioCtx = null;
-let analyser = null;
-let sourceNode = null;
-let dataArray = null;
-let timeArray = null;
-let animationId = null;
-let displayStream = null;
-let currentVis = 'bars';
-
-const visualizers = ['bars','radial','waveform','particles','spectrogram','oscilloscope'];
-
-// build UI buttons
-visualizers.forEach(v => {
-  const b = document.createElement('button');
-  b.className = 'vis-btn' + (v===currentVis? ' active':'');
-  b.textContent = v;
-  b.onclick = () => { selectVis(v); document.querySelectorAll('.vis-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
-  visList.appendChild(b);
-});
-
-function selectVis(name){ currentVis = name; }
-
-fftRange.addEventListener('input', ()=>{ fftVal.textContent = fftRange.value; if(analyser) analyser.fftSize = Number(fftRange.value); });
-smoothRange.addEventListener('input', ()=>{ smoothVal.textContent = Number(smoothRange.value).toFixed(2); if(analyser) analyser.smoothingTimeConstant = Number(smoothRange.value); });
-densityRange.addEventListener('input', ()=>{ densityVal.textContent = densityRange.value; });
+let audioCtx=null, analyser=null, sourceNode=null, dataArray=null, timeArray=null, animationId=null, displayStream=null;
+let currentVis='bars';
+const visualizers=['bars','radial','waveform','particles','spectrogram','oscilloscope'];
+visualizers.forEach(v=>{ const b=document.createElement('button'); b.className='vis-btn'+(v===currentVis?' active':''); b.textContent=v; b.onclick=()=>{ currentVis=v; document.querySelectorAll('.vis-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }; visList.appendChild(b); });
+fftRange.addEventListener('input',()=>{ fftVal.textContent=fftRange.value; if(analyser) analyser.fftSize=Number(fftRange.value); });
+smoothRange.addEventListener('input',()=>{ smoothVal.textContent=Number(smoothRange.value).toFixed(2); if(analyser) analyser.smoothingTimeConstant=Number(smoothRange.value); });
+densityRange.addEventListener('input',()=>{ densityVal.textContent=densityRange.value; });
 
 async function startShare(){
-  if(audioCtx && audioCtx.state !== 'closed') {
-    // already running, stop first
-    stopShare();
-  }
+  if(audioCtx && audioCtx.state!=='closed') stopShare();
   try{
-    // ask user to share display/tab with audio
-    const stream = await navigator.mediaDevices.getDisplayMedia({audio:true, video:false});
-    // some browsers return an object with getAudioTracks === [] if audio wasn't allowed
-    if(!stream.getAudioTracks().length){
-      alert('no audio track in the shared stream, make sure you checked "share audio" when selecting a tab.');
-      stream.getTracks().forEach(t=>t.stop());
-      return;
-    }
-
-    displayStream = stream;
-
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // resume on user gesture
-    await audioCtx.resume();
-
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = Number(fftRange.value);
-    analyser.smoothingTimeConstant = Number(smoothRange.value);
-
-    sourceNode = audioCtx.createMediaStreamSource(stream);
-    sourceNode.connect(analyser);
-
-    const bufferLen = analyser.frequencyBinCount;
-    dataArray = new Uint8Array(bufferLen);
-    timeArray = new Uint8Array(bufferLen);
-
-    // start render loop
+    // force only a single tab selection
+    const stream=await navigator.mediaDevices.getDisplayMedia({video:false,audio:{mandatory:{chromeMediaSource:'tab'}}});
+    if(!stream.getAudioTracks().length){ alert('no audio track, make sure you checked "share audio" when selecting a tab.'); stream.getTracks().forEach(t=>t.stop()); return; }
+    displayStream=stream;
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)(); await audioCtx.resume();
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=Number(fftRange.value); analyser.smoothingTimeConstant=Number(smoothRange.value);
+    sourceNode=audioCtx.createMediaStreamSource(stream); sourceNode.connect(analyser);
+    const bufferLen=analyser.frequencyBinCount; dataArray=new Uint8Array(bufferLen); timeArray=new Uint8Array(bufferLen);
+    stream.getVideoTracks().forEach(t=>t.onended=stopShare);
+    stream.getAudioTracks().forEach(t=>t.onended=stopShare);
     tick();
-
-    // when user stops sharing from browser UI, stop everything
-    stream.getVideoTracks().forEach(t => t.onended = stopShare);
-    stream.getAudioTracks().forEach(t => t.onended = stopShare);
-
-  }catch(err){
-    console.error('share failed', err);
-    alert('screen share failed: ' + (err && err.message ? err.message : err));
-  }
+  }catch(err){ alert('tab share failed: '+(err.message||err)); }
 }
-
-function stopShare(){
-  if(displayStream){
-    displayStream.getTracks().forEach(t=>t.stop());
-    displayStream = null;
-  }
-  if(sourceNode){ try{ sourceNode.disconnect(); }catch(e){} sourceNode=null; }
-  if(analyser){ analyser.disconnect(); analyser = null; }
-  if(audioCtx){ try{ audioCtx.close(); }catch(e){} audioCtx = null; }
-  if(animationId) cancelAnimationFrame(animationId);
-  animationId = null;
-  clearCanvas();
-}
-
-stopBtn.onclick = stopShare;
-shareBtn.onclick = startShare;
-
+function stopShare(){ if(displayStream){ displayStream.getTracks().forEach(t=>t.stop()); displayStream=null; } if(sourceNode){ try{sourceNode.disconnect();}catch(e){} sourceNode=null; } if(analyser){ analyser.disconnect(); analyser=null; } if(audioCtx){ try{audioCtx.close();}catch(e){} audioCtx=null; } if(animationId) cancelAnimationFrame(animationId); animationId=null; clearCanvas(); }
+stopBtn.onclick=stopShare; shareBtn.onclick=startShare;
 function clearCanvas(){ ctx.clearRect(0,0,W,H); }
-
-// helpers
-function lerp(a,b,t){return a + (b-a)*t}
-function map(v,a,b,c,d){return c + (d-c) * ((v-a)/(b-a));}
-
-// persistent state for particles
-const particles = [];
-for(let i=0;i<300;i++){ particles.push({x:Math.random(),y:Math.random(),vx:0,vy:0,size:Math.random()*3+1,life:0}); }
-
-// spectrogram offscreen image
-let specImg = null;
-
-// main render loop
-function tick(){
-  resize();
-  if(!analyser) return;
-  analyser.getByteFrequencyData(dataArray);
-  analyser.getByteTimeDomainData(timeArray);
-
-  ctx.clearRect(0,0,W,H);
-
-  const vis = currentVis;
-  if(vis==='bars') drawBars();
-  else if(vis==='radial') drawRadial();
-  else if(vis==='waveform') drawWaveform();
-  else if(vis==='particles') drawParticles();
-  else if(vis==='spectrogram') drawSpectrogram();
-  else if(vis==='oscilloscope') drawOscilloscope();
-
-  animationId = requestAnimationFrame(tick);
-}
-
-// visualizers
-function drawBars(){
-  const bins = Math.min(dataArray.length, Number(densityRange.value));
-  const barW = W / bins;
-  for(let i=0;i<bins;i++){
-    const v = dataArray[Math.floor(i * dataArray.length / bins)]/255;
-    const h = v * H;
-    const x = i * barW;
-    // gradient color
-    const hue = Math.floor(map(i,0,bins,160,360));
-    ctx.fillStyle = `hsl(${hue} 80% 60%)`;
-    ctx.fillRect(x, H - h, Math.max(1, barW - 2), h);
-  }
-}
-
-function drawRadial(){
-  const cx = W/2, cy = H/2, radius = Math.min(W,H)*0.18;
-  const bins = Math.min(dataArray.length, Number(densityRange.value));
-  const maxR = Math.min(W,H)*0.45;
-  for(let i=0;i<bins;i++){
-    const a = map(i,0,bins,0,Math.PI*2);
-    const v = dataArray[Math.floor(i * dataArray.length / bins)]/255;
-    const r = radius + v * (maxR - radius);
-    const x = cx + Math.cos(a) * r;
-    const y = cy + Math.sin(a) * r;
-    const x0 = cx + Math.cos(a) * radius;
-    const y0 = cy + Math.sin(a) * radius;
-    ctx.lineWidth = 2 * devicePixelRatio;
-    ctx.strokeStyle = `hsl(${Math.floor(map(i,0,bins,0,360))} 80% 65%)`;
-    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x,y); ctx.stroke();
-  }
-  // center glow
-  const g = ctx.createRadialGradient(cx,cy,0,cx,cy,Math.min(W,H)*0.4);
-  g.addColorStop(0,'rgba(52,211,153,0.12)');
-  g.addColorStop(1,'rgba(2,6,10,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx,cy,Math.min(W,H)*0.4,0,Math.PI*2); ctx.fill();
-}
-
-function drawWaveform(){
-  ctx.lineWidth = 2 * devicePixelRatio;
-  ctx.beginPath();
-  const step = Math.max(1, Math.floor(timeArray.length / W));
-  const mid = H/2;
-  ctx.moveTo(0, mid);
-  for(let x=0, i=0; x<W; x+=1, i+=step){
-    const v = (timeArray[i] - 128) / 128; // -1..1
-    ctx.lineTo(x, mid + v * (H*0.45));
-  }
-  ctx.strokeStyle = 'rgba(60,180,220,0.95)';
-  ctx.stroke();
-  // add glow
-  ctx.globalAlpha = 0.09;
-  ctx.lineWidth = 20 * devicePixelRatio;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-}
-
-function drawParticles(){
-  // derive low frequency energy
-  const bass = dataArray.slice(0, Math.floor(dataArray.length*0.12)).reduce((s,v)=>s+v,0) / (dataArray.length*0.12) / 255;
-  for(let p of particles){
-    // simple movement influenced by bass
-    p.vx += (Math.random()-0.5) * 0.02 + (Math.random()-0.5) * bass * 0.5;
-    p.vy += (Math.random()-0.5) * 0.02 - bass * 0.15;
-    p.x += p.vx * (W * 0.002);
-    p.y += p.vy * (H * 0.002);
-    // wrap
-    if(p.x < -0.05) p.x = 1.05; if(p.x > 1.05) p.x = -0.05;
-    if(p.y < -0.05) p.y = 1.05; if(p.y > 1.05) p.y = -0.05;
-    // size pulse
-    const size = p.size + bass * 8;
-    ctx.beginPath(); ctx.arc(p.x * W, p.y * H, size*devicePixelRatio,0,Math.PI*2);
-    ctx.fillStyle = `rgba(${Math.floor(200 + 55*bass)}, ${Math.floor(80+160*bass)}, 220, ${0.6})`;
-    ctx.fill();
-  }
-}
-
-function drawSpectrogram(){
-  // prepare an offscreen canvas stored in specImg
-  if(!specImg){ specImg = document.createElement('canvas'); specImg.width = W; specImg.height = H; }
-  const sctx = specImg.getContext('2d');
-  // shift left 1 px
-  const shift = Math.max(1, Math.floor(devicePixelRatio));
-  const img = sctx.getImageData(shift,0, specImg.width-shift, specImg.height);
-  sctx.putImageData(img,0,0);
-
-  // draw new column at right
-  const col = sctx.createImageData(1, specImg.height);
-  const bins = specImg.height; // vertical resolution
-  for(let y=0;y<bins;y++){
-    const idx = Math.floor(map(y,0,bins,0,dataArray.length-1));
-    const v = dataArray[idx];
-    const hue = Math.floor(map(v,0,255,240,0));
-    const rgb = hslToRgb(hue/360,1,0.5);
-    const i = (bins - y -1) * 4; // vertical flip so low freq at bottom
-    col.data[i] = rgb[0]; col.data[i+1] = rgb[1]; col.data[i+2] = rgb[2]; col.data[i+3] = 255;
-  }
-  sctx.putImageData(col, specImg.width - shift, 0);
-
-  // draw to main canvas scaled
-  ctx.drawImage(specImg, 0, 0, W, H);
-}
-
-function drawOscilloscope(){
-  // classic preexisting style, like an old-school oscilloscope
-  ctx.fillStyle = '#021017'; ctx.fillRect(0,0,W,H);
-  ctx.lineWidth = 2 * devicePixelRatio;
-  ctx.strokeStyle = '#0fef9c';
-  ctx.beginPath();
-  const step = Math.max(1, Math.floor(timeArray.length / W));
-  const mid = H/2;
-  for(let x=0, i=0; x<W; x+=1, i+=step){
-    const v = (timeArray[i] - 128) / 128;
-    const y = mid + v * (H*0.45);
-    if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  }
-  ctx.stroke();
-  // faint gridlines
-  ctx.strokeStyle = 'rgba(15,239,156,0.06)'; ctx.lineWidth = 1*devicePixelRatio;
-  for(let x=0;x<W;x+=Math.floor(W/10)) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-  for(let y=0;y<H;y+=Math.floor(H/10)) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-}
-
-// utility: hsl to rgb
-function hslToRgb(h, s, l){
-  let r, g, b;
-  if(s == 0){ r = g = b = l; } else {
-    const hue2rgb = function(p, q, t){
-      if(t < 0) t += 1;
-      if(t > 1) t -= 1;
-      if(t < 1/6) return p + (q - p) * 6 * t;
-      if(t < 1/2) return q;
-      if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    }
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1/3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
-  }
-  return [ Math.round(r * 255), Math.round(g * 255), Math.round(b * 255) ];
-}
-
-// start tick even if no audio, draws a subtle background
-(function idleLoop(){
-  if(!animationId){
-    ctx.clearRect(0,0,W,H);
-    // subtle background grid
-    ctx.fillStyle = 'rgba(255,255,255,0.01)';
-    for(let i=0;i<40;i++){
-      const x = (i/40)*W;
-      ctx.fillRect(x,0,1,1);
-    }
-  }
-  requestAnimationFrame(idleLoop);
-})();
-
-// ensure canvas resize matches container on load
-setTimeout(resize,100);
-
+function tick(){ if(!analyser) return; analyser.getByteFrequencyData(dataArray); analyser.getByteTimeDomainData(timeArray); ctx.clearRect(0,0,W,H); if(currentVis==='bars') drawBars(); else if(currentVis==='radial') drawRadial(); else if(currentVis==='waveform') drawWaveform(); else if(currentVis==='particles') drawParticles(); else if(currentVis==='spectrogram') drawSpectrogram(); else if(currentVis==='oscilloscope') drawOscilloscope(); animationId=requestAnimationFrame(tick); }
+function drawBars(){ const bins=Math.min(dataArray.length, Number(densityRange.value)); const barW=W/bins; for(let i=0;i<bins;i++){ const v=dataArray[Math.floor(i*dataArray.length/bins)]/255; const h=v*H; const x=i*barW; ctx.fillStyle=`hsl(${Math.floor(map(i,0,bins,160,360))} 80% 60%)`; ctx.fillRect(x,H-h,Math.max(1,barW-2),h); }}
+function drawRadial(){ const cx=W/2,cy=H/2,radius=Math.min(W,H)*0.18; const bins=Math.min(dataArray.length,Number(densityRange.value)); const maxR=Math.min(W,H)*0.45; for(let i=0;i<bins;i++){ const a=map(i,0,bins,0,Math.PI*2); const v=dataArray[Math.floor(i*dataArray.length/bins)]/255; const r=radius+v*(maxR-radius); const x=cx+Math.cos(a)*r; const y=cy+Math.sin(a)*r; const x0=cx+Math.cos(a)*radius; const y0=cy+Math.sin(a)*radius; ctx.lineWidth=2*devicePixelRatio; ctx.strokeStyle=`hsl(${Math.floor(map(i,0,bins,0,360))} 80% 65%)`; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x,y); ctx.stroke(); }}
+function drawWaveform(){ ctx.lineWidth=2*devicePixelRatio; ctx.beginPath(); const step=Math.max(1,Math.floor(timeArray.length/W)); const mid=H/2; ctx.moveTo(0,mid); for(let x=0,i=0;x<W;x++,i+=step){ const v=(timeArray[i]-128)/128; ctx.lineTo(x,mid+v*(H*0.45)); } ctx.strokeStyle='rgba(60,180,220,0.95)'; ctx.stroke(); }
+function drawParticles(){ const bass=dataArray.slice(0,Math.floor(dataArray.length*0.12)).reduce((s,v)=>s+v,0)/(dataArray.length*0.12)/255; for(let p of particles){ p.vx+=(Math.random()-0.5)*0.02+(Math.random()-0.5)*bass*0.5; p.vy+=(Math.random()-0.5)*0.02-bass*0.15; p.x+=p.vx*(W*0.002); p.y+=p.vy*(H*0.002); if(p.x<-0.05)p.x=1.05;if(p.x>1.05)p.x=-0.05;if(p.y<-0.05)p.y=1.05;if(p.y>1.05)p.y=-0.05; const size=p.size+bass*8; ctx.beginPath(); ctx.arc(p.x*W,p.y*H,size*devicePixelRatio,0,Math.PI*2); ctx.fillStyle=`rgba(${Math.floor(200+55*bass)},${Math.floor(80+160*bass)},220,0.6)`; ctx.fill(); }}
+function drawSpectrogram(){ if(!specImg){ specImg=document.createElement('canvas'); specImg.width=W; specImg.height=H; } const sctx=specImg.getContext('2d'); const shift=Math.max(1,Math.floor(devicePixelRatio)); const img=sctx.getImageData(shift,0,specImg.width-shift,specImg.height); sctx.putImageData(img,0,0); const col=sctx.createImageData(1,specImg.height); const bins=specImg.height; for(let y=0;y<bins;y++){ const idx=Math.floor(map(y,0,bins,0,dataArray.length-1)); const v=dataArray[idx]; const hue=Math.floor(map(v,0,255,240,0)); const rgb=hslToRgb(hue/360,1,0.5); const i=(bins-y-1)*4; col.data[i]=rgb[0]; col.data[i+1]=rgb[1]; col.data[i+2]=rgb[2]; col.data[i+3]=255; } sctx.putImageData(col,specImg.width-shift,0); ctx.drawImage(specImg,0,0,W,H); }
+function drawOscilloscope(){ ctx.fillStyle='#021017'; ctx.fillRect(0,0,W,H); ctx.lineWidth=2*devicePixelRatio; ctx.strokeStyle='#0fef9c'; ctx.beginPath(); const step=Math.max(1,Math.floor(timeArray.length/W)); const mid=H/2; for(let x=0,i=0;x<W;x++,i+=step){ const v=(timeArray[i]-128)/128; const y=mid+v*(H*0.45); if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.stroke(); }
+function lerp(a,b,t){return a+(b-a)*t;} function map(v,a,b,c,d){return c+(d-c)*((v-a)/(b-a));}
+function hslToRgb(h,s,l){let r,g,b;if(s==0){r=g=b=l;}else{const hue2rgb=function(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}; const q=l<0.5?l*(1+s):l+s-l*s; const p=2*l-q; r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);} return [Math.round(r*255),Math.round(g*255),Math.round(b*255)];}
+const particles=[]; for(let i=0;i<300;i++){particles.push({x:Math.random(),y:Math.random(),vx:0,vy:0,size:Math.random()*3+1,life:0});}
+let specImg=null;
+(function idleLoop(){if(!animationId){ctx.clearRect(0,0,W,H);}requestAnimationFrame(idleLoop);})();
 </script>
 </body>
 </html>
