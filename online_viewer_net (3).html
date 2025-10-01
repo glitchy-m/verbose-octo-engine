@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Adaptive Video Chat</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --video-bg: #2c2c2c;
+            --text-color: #f0f0f0;
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --border-color: #444;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        #my-id-container {
+            font-size: 1.1rem;
+            word-wrap: break-word;
+        }
+        #my-id {
+            background-color: var(--video-bg);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        input[type="text"] {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            background-color: var(--video-bg);
+            color: var(--text-color);
+            border-radius: 5px;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+        #video-grid {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        .video-container {
+            position: relative;
+            background-color: var(--video-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .peer-id-label {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Adaptive P2P Video Chat</h1>
+        <p id="my-id-container">Your ID: <span id="my-id">Loading...</span></p>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="call-id-input" placeholder="Enter Peer ID to call">
+        <button id="call-btn">Call</button>
+    </div>
+
+    <div id="video-grid"></div>
+
+    <script>
+        // --- Quality Configuration ---
+        const QUALITY_LEVELS = {
+            LOW: { video: { width: { exact: 320 }, height: { exact: 240 }, frameRate: { ideal: 15 } } },
+            MEDIUM: { video: { width: { exact: 640 }, height: { exact: 480 }, frameRate: { ideal: 24 } } },
+            HIGH: { video: { width: { exact: 1280 }, height: { exact: 720 }, frameRate: { ideal: 30 } } }
+        };
+
+        const QUALITY_THRESHOLDS = {
+            HIGH: 4,
+            MEDIUM: 8,
+        };
+
+        // --- Global Variables ---
+        const videoGrid = document.getElementById('video-grid');
+        const myIdSpan = document.getElementById('my-id');
+        const callInput = document.getElementById('call-id-input');
+        const callBtn = document.getElementById('call-btn');
+
+        let myPeer;
+        let myStream;
+        let currentQualityLevel = null;
+        const peers = {}; // key: peerId, value: call object
+
+        // --- Initialization ---
+        async function init() {
+            // Use the public PeerJS server
+            myPeer = new Peer(undefined, {
+                host: '0.peerjs.com',
+                port: 443,
+                path: '/',
+                secure: true
+            });
+
+            myPeer.on('open', id => {
+                myIdSpan.textContent = id;
+                console.log('My PeerJS ID is:', id);
+                // Get initial video stream
+                updateVideoQuality();
+            });
+
+            myPeer.on('call', call => {
+                // Someone is calling us, answer with our current stream
+                call.answer(myStream);
+                console.log(`Answering call from ${call.peer}`);
+
+                const videoContainer = createVideoContainer(call.peer);
+                const video = videoContainer.querySelector('video');
+
+                call.on('stream', userVideoStream => {
+                    addVideoStream(video, userVideoStream);
+                });
+
+                call.on('close', () => {
+                    videoContainer.remove();
+                    delete peers[call.peer];
+                    updateVideoQuality(); // Re-evaluate quality when someone leaves
+                });
+                
+                peers[call.peer] = call;
+            });
+
+            myIdSpan.onclick = () => {
+                navigator.clipboard.writeText(myPeer.id);
+                alert('Your ID has been copied to the clipboard!');
+            };
+            
+            callBtn.onclick = () => {
+                const remotePeerId = callInput.value.trim();
+                if (remotePeerId && remotePeerId !== myPeer.id) {
+                    connectToNewUser(remotePeerId, myStream);
+                } else {
+                    alert('Please enter a valid Peer ID.');
+                }
+                callInput.value = '';
+            };
+        }
+
+        // --- Core Functions ---
+
+        function createVideoContainer(peerId) {
+            const container = document.createElement('div');
+            container.classList.add('video-container');
+            container.dataset.peerId = peerId;
+
+            const video = document.createElement('video');
+            container.appendChild(video);
+
+            const label = document.createElement('div');
+            label.classList.add('peer-id-label');
+            label.textContent = peerId;
+            container.appendChild(label);
+            
+            videoGrid.appendChild(container);
+            return container;
+        }
+
+        function addVideoStream(videoElement, stream) {
+            videoElement.srcObject = stream;
+            videoElement.addEventListener('loadedmetadata', () => {
+                videoElement.play();
+            });
+        }
+
+        function connectToNewUser(userId, stream) {
+            if (peers[userId]) {
+                console.log(`Already connected to ${userId}.`);
+                return;
+            }
+            console.log(`Calling ${userId}`);
+            const call = myPeer.call(userId, stream);
+
+            const videoContainer = createVideoContainer(userId);
+            const video = videoContainer.querySelector('video');
+
+            call.on('stream', userVideoStream => {
+                addVideoStream(video, userVideoStream);
+            });
+
+            call.on('close', () => {
+                videoContainer.remove();
+                delete peers[userId];
+                updateVideoQuality();
+            });
+            
+            peers[userId] = call;
+            updateVideoQuality(); // Update quality after new connection is established
+        }
+
+        async function updateVideoQuality() {
+            const connectionCount = Object.keys(peers).length + 1; // +1 for self
+            let targetQuality;
+
+            if (connectionCount <= QUALITY_THRESHOLDS.HIGH) {
+                targetQuality = 'HIGH';
+            } else if (connectionCount <= QUALITY_THRESHOLDS.MEDIUM) {
+                targetQuality = 'MEDIUM';
+            } else {
+                targetQuality = 'LOW';
+            }
+
+            if (targetQuality === currentQualityLevel) {
+                console.log(`Quality level is already ${targetQuality} for ${connectionCount} users.`);
+                return;
+            }
+            
+            console.log(`Updating quality to ${targetQuality} for ${connectionCount} users.`);
+            currentQualityLevel = targetQuality;
+            
+            const constraints = { ...QUALITY_LEVELS[targetQuality], audio: true };
+
+            try {
+                // Get the new stream
+                const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // Update my own video element
+                let myVideoContainer = document.querySelector(`[data-peer-id="me"]`);
+                if (!myVideoContainer) {
+                    myVideoContainer = createVideoContainer('me');
+                    const myLabel = myVideoContainer.querySelector('.peer-id-label');
+                    myLabel.textContent = 'Me (Muted)';
+                    const myVideo = myVideoContainer.querySelector('video');
+                    myVideo.muted = true; // Mute self to avoid echo
+                }
+                addVideoStream(myVideoContainer.querySelector('video'), newStream);
+
+                // For all existing calls, replace the video track
+                if (myStream) {
+                    for (const peerId in peers) {
+                        const call = peers[peerId];
+                        const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
+                        if (sender) {
+                            sender.replaceTrack(newStream.getVideoTracks()[0]);
+                        }
+                    }
+                }
+
+                // Stop the old stream's tracks
+                if (myStream) {
+                    myStream.getTracks().forEach(track => track.stop());
+                }
+
+                // Store the new stream globally
+                myStream = newStream;
+
+            } catch (err) {
+                console.error('Failed to get media or update quality:', err);
+                alert('Could not access camera/microphone or set quality. Please check permissions.');
+            }
+        }
+        
+        // --- Start the application ---
+        init();
+
+    </script>
+</body>
+</html>
