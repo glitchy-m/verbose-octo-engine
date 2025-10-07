@@ -182,16 +182,16 @@
         </div>
 
         <!-- Master Controls Toggle -->
-        <button id="toggle-controls-btn" class="absolute top-4 left-4 z-50 text-2xl p-2 bg-gray-800/50 rounded-full hover:bg-gray-700/70 transition-colors">
-            ⚙️
+        <button id="toggle-controls-btn" class="absolute top-4 left-4 z-50 text-white p-2 bg-gray-800/50 rounded-full hover:bg-gray-700/70 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-75"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </button>
 
         <!-- Debug Panel -->
         <div id="debug-panel" class="absolute top-16 left-4 z-50 bg-gray-800/80 backdrop-blur-md p-4 rounded-lg space-y-3 hidden">
             <h3 class="font-bold text-lg">Debug Controls</h3>
             <div>
-                <label for="debug-time" class="block text-sm font-medium">Override Time (Hour)</label>
-                <input type="range" id="debug-time" min="0" max="23" step="1" class="w-full">
+                <label for="debug-time" class="block text-sm font-medium">Override Time</label>
+                <input type="time" id="debug-time" class="w-full bg-gray-700 rounded-md p-1 border border-gray-600 text-white">
             </div>
              <div>
                 <label for="debug-weather" class="block text-sm font-medium">Override Weather</label>
@@ -358,7 +358,8 @@
             const now = new Date();
             // Allow debug override
             if (debugMode.time !== null) {
-                now.setHours(debugMode.time);
+                const [hour, minute] = debugMode.time.split(':').map(Number);
+                now.setHours(hour, minute || 0);
             }
 
             const hours = now.getHours();
@@ -367,14 +368,19 @@
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
             const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'long' });
 
-            if (isNight && debugMode.time === null) { // Only auto-switch if not debugging time
-                if (activeViewId !== 'night-view') switchView('night-view');
-                updateWeatherEffects(true);
-            } else if (activeViewId === 'night-view' && !isNight && debugMode.time === null) {
-                switchView(viewSelector.value);
-                updateWeatherEffects(false);
+            // This logic now correctly handles manual overrides
+            if (isNight) {
+                if (activeViewId !== 'night-view') {
+                    switchView('night-view');
+                    updateWeatherEffects(true);
+                }
+            } else {
+                 if (activeViewId === 'night-view') {
+                    switchView(previousViewId || 'quick-look-view');
+                    updateWeatherEffects(false);
+                }
             }
-
+            
             document.getElementById('night-time').textContent = timeString;
             document.getElementById('night-date').textContent = dateString;
             document.getElementById('quick-time').textContent = timeString;
@@ -694,7 +700,7 @@
             const debugWeather = document.getElementById('debug-weather');
             
             debugTime.addEventListener('input', (e) => {
-                debugMode.time = parseInt(e.target.value);
+                debugMode.time = e.target.value || null;
                 updateTimeAndDate(); // Force immediate update
             });
 
@@ -818,7 +824,7 @@
                         'Authorization': `Bearer ${OPENAI_API_KEY}`
                     },
                     body: JSON.stringify({
-                        model: "gpt-5-mini-2025-08-07",
+                        model: "gpt-3.5-turbo",
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.7,
                         max_tokens: 40,
@@ -841,4 +847,5 @@
     </script>
 </body>
 </html>
+
 
