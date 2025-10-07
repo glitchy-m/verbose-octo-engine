@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Calendar Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        /* Custom styles and animations */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- Weather Backgrounds --- */
+        .weather-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            transition: background 1s ease-in-out;
+        }
+
+        .weather-clear {
+            background: linear-gradient(to bottom, #87CEEB, #4682B4);
+        }
+        
+        .weather-clouds {
+            background: linear-gradient(to bottom, #B0C4DE, #778899);
+        }
+
+        .weather-rain, .weather-drizzle, .weather-thunderstorm {
+             background: linear-gradient(to bottom, #465875, #1f2937);
+             overflow: hidden;
+        }
+
+        .weather-rain::before, .weather-drizzle::before, .weather-thunderstorm::before {
+            content: '';
+            position: absolute;
+            top: -200%;
+            left: 0;
+            width: 100%;
+            height: 300%;
+            background-image: linear-gradient(transparent, rgba(255,255,255,0.1) 50%, transparent);
+            background-size: 2px 50px;
+            animation: rain-animation 0.5s linear infinite;
+        }
+        
+        @keyframes rain-animation {
+            from { transform: translateY(0); }
+            to { transform: translateY(100%); }
+        }
+
+        .weather-snow {
+            background: linear-gradient(to bottom, #e0e0e0, #a0a0a0);
+        }
+
+        .weather-night {
+            background-color: #0c0a09;
+        }
+
+        /* --- View Transitions --- */
+        .view {
+            display: none;
+            animation: fadeIn 0.8s ease-in-out;
+            opacity: 0;
+            will-change: opacity;
+        }
+
+        .view.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* --- Calendar Grid --- */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .calendar-day, .calendar-header {
+            background-color: rgba(17, 24, 39, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .calendar-day {
+            min-height: 10vh;
+        }
+        .calendar-day.other-month {
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-900 text-white overflow-hidden">
+    <!-- Weather Background -->
+    <div id="weather-bg" class="weather-bg"></div>
+
+    <!-- Main Container -->
+    <div class="relative flex flex-col h-full p-4 sm:p-6 md:p-8 lg:p-12">
+        
+        <!-- Auth Screen -->
+        <div id="auth-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-md">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold mb-4">Welcome to Your Dynamic Display</h1>
+                <p class="mb-6 text-gray-300">Please connect your Google Calendar to see your events.</p>
+                <button id="authorize-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                    Connect Google Calendar
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Look View -->
+        <div id="quick-look-view" class="view flex-col justify-between h-full w-full">
+            <!-- Top Section: Time, Date, Weather -->
+            <div class="flex justify-between items-start">
+                <div>
+                    <div id="quick-time" class="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight"></div>
+                    <div id="quick-date" class="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-300"></div>
+                </div>
+                <div id="quick-weather" class="text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <div id="quick-weather-icon" class="w-12 h-12 md:w-16 md:h-16"></div>
+                        <div id="quick-temp" class="text-3xl md:text-5xl font-semibold"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Section: Events & Quote -->
+            <div class="flex-grow flex items-center justify-center">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 w-full max-w-6xl">
+                    <div id="events-container" class="space-y-6">
+                        <!-- Events will be injected here -->
+                    </div>
+                    <div class="flex items-center">
+                         <blockquote id="quote-container" class="text-2xl md:text-3xl lg:text-4xl font-light italic text-gray-200">
+                           "..."
+                        </blockquote>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bottom Section: Hint -->
+            <div class="text-center text-gray-400 text-sm pb-4">
+                Your Google Calendar
+            </div>
+        </div>
+
+        <!-- Monthly View -->
+        <div id="monthly-view" class="view flex-col h-full w-full">
+             <div class="flex justify-between items-baseline mb-4">
+                <h1 id="calendar-title" class="text-4xl md:text-5xl font-bold"></h1>
+                <p class="text-gray-300">Your Google Calendar</p>
+            </div>
+            <div id="calendar-header" class="calendar-grid">
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">SUN</div>
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">MON</div>
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">TUE</div>
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">WED</div>
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">THU</div>
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">FRI</div>
+                <div class="calendar-header p-2 text-center font-semibold text-gray-300">SAT</div>
+            </div>
+            <div id="calendar-body" class="calendar-grid flex-grow">
+                <!-- Calendar days will be injected here -->
+            </div>
+        </div>
+
+        <!-- Night View -->
+        <div id="night-view" class="view flex-col justify-center items-center h-full w-full text-center">
+             <div id="night-time" class="text-7xl md:text-9xl font-bold tracking-tight"></div>
+             <div id="night-date" class="text-4xl md:text-6xl font-medium text-gray-300"></div>
+             <div id="night-weather" class="flex items-center justify-center gap-2 mt-8">
+                <div id="night-temp" class="text-2xl md:text-3xl font-semibold"></div>
+                <div id="night-weather-icon" class="w-10 h-10"></div>
+            </div>
+            <p class="mt-12 text-2xl text-gray-400">Good night!</p>
+        </div>
+
+        <!-- Navigation Arrows -->
+        <div id="nav-left" class="absolute left-0 top-1/2 -translate-y-1/2 z-30 cursor-pointer p-4 opacity-50 hover:opacity-100 transition-opacity">
+            <svg class="w-8 h-8 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </div>
+        <div id="nav-right" class="absolute right-0 top-1/2 -translate-y-1/2 z-30 cursor-pointer p-4 opacity-50 hover:opacity-100 transition-opacity">
+            <svg class="w-8 h-8 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // --- CONFIGURATION ---
+        // IMPORTANT: Replace these with your actual credentials.
+        // You can get these from Google Cloud Console and OpenWeatherMap.
+        // In Google Cloud, ensure your API key has the "Google Calendar API" enabled.
+        // For the OAuth Client ID, add your domain (e.g., http://localhost:8000) to the "Authorized JavaScript origins".
+        const GOOGLE_CLIENT_ID = '415018106195-utjkai9r1ar3pd6ep5f06kt5ma0tfg0k.apps.googleusercontent.com';
+        const GOOGLE_API_KEY = 'AIzaSyCbgUrIug-IwZGHDDYW751tcLG3zV6iMD0';
+        const OPENWEATHER_API_KEY = 'e59fe270071be5ed24b5a1ec85ef84c3';
+        
+        // --- STATE & ELEMENTS ---
+        const gapiClient = window.gapi;
+        const views = ['quick-look-view', 'monthly-view'];
+        let currentViewIndex = 0;
+        let viewInterval;
+        let tokenClient;
+
+        // --- DOM Elements ---
+        const authScreen = document.getElementById('auth-screen');
+        const authorizeButton = document.getElementById('authorize-button');
+
+        const quickTimeEl = document.getElementById('quick-time');
+        const quickDateEl = document.getElementById('quick-date');
+        const quickWeatherEl = document.getElementById('quick-weather');
+        const quickWeatherIconEl = document.getElementById('quick-weather-icon');
+        const quickTempEl = document.getElementById('quick-temp');
+        const eventsContainer = document.getElementById('events-container');
+        const quoteContainer = document.getElementById('quote-container');
+
+        const calendarTitleEl = document.getElementById('calendar-title');
+        const calendarBodyEl = document.getElementById('calendar-body');
+
+        const nightViewEl = document.getElementById('night-view');
+        const nightTimeEl = document.getElementById('night-time');
+        const nightDateEl = document.getElementById('night-date');
+        const nightWeatherEl = document.getElementById('night-weather');
+        const nightWeatherIconEl = document.getElementById('night-weather-icon');
+        const nightTempEl = document.getElementById('night-temp');
+        
+        const weatherBg = document.getElementById('weather-bg');
+        
+        const navLeft = document.getElementById('nav-left');
+        const navRight = document.getElementById('nav-right');
+
+
+        // --- CORE LOGIC ---
+
+        function initializeApp() {
+            // Check for placeholder API keys
+            if (GOOGLE_CLIENT_ID.startsWith('YOUR_') || OPENWEATHER_API_KEY.startsWith('YOUR_')) {
+                authScreen.innerHTML = `
+                    <div class="text-center bg-yellow-900/50 p-8 rounded-lg border border-yellow-500">
+                        <h1 class="text-3xl font-bold mb-4 text-yellow-300">Configuration Needed</h1>
+                        <p class="mb-6 text-yellow-200">Please replace the placeholder API keys in the HTML file to enable the application.</p>
+                    </div>
+                `;
+                authScreen.style.display = 'flex';
+                return;
+            }
+            
+            // Start main clock and update cycle
+            updateTimeAndDate();
+            setInterval(updateTimeAndDate, 1000);
+
+            // Fetch initial data
+            fetchWeather();
+            fetchQuote();
+            setInterval(fetchWeather, 15 * 60 * 1000); // every 15 mins
+
+            // Setup Google API clients
+            gapi.load('client', initializeGapiClient);
+            
+            // Bind navigation
+            navLeft.addEventListener('click', () => switchView(currentViewIndex - 1, true));
+            navRight.addEventListener('click', () => switchView(currentViewIndex + 1, true));
+            authorizeButton.addEventListener('click', handleAuthClick);
+        }
+
+        // --- TIME, DATE & MODE SWITCHING ---
+
+        function updateTimeAndDate() {
+            const now = new Date();
+            const hours = now.getHours();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' AM', '').replace(' PM', '');
+            const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'long' });
+
+            if (hours >= 22 || hours < 5) { // Night mode from 10 PM to 5 AM
+                if (!nightViewEl.classList.contains('active')) {
+                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                    nightViewEl.classList.add('active');
+                    weatherBg.className = 'weather-bg weather-night';
+                    [navLeft, navRight].forEach(nav => nav.style.display = 'none');
+                }
+                nightTimeEl.textContent = timeString;
+                nightDateEl.textContent = dateString;
+            } else {
+                if (nightViewEl.classList.contains('active')) {
+                    nightViewEl.classList.remove('active');
+                    switchView(currentViewIndex, true); // Go back to the last active view
+                    fetchWeather(); // Refresh weather for daytime background
+                }
+                 [navLeft, navRight].forEach(nav => nav.style.display = 'block');
+                quickTimeEl.textContent = timeString;
+                quickDateEl.textContent = dateString;
+            }
+        }
+        
+        // --- VIEW MANAGEMENT ---
+        
+        function switchView(index, manual = false) {
+            if (manual) {
+                clearInterval(viewInterval);
+                viewInterval = setInterval(() => switchView(currentViewIndex + 1), 30000); // Reset timer
+            }
+            
+            const newIndex = (index + views.length) % views.length;
+            currentViewIndex = newIndex;
+            
+            document.querySelectorAll('.view').forEach((view, i) => {
+                const viewId = views[newIndex];
+                if (view.id === viewId) {
+                    view.classList.add('active');
+                } else {
+                    view.classList.remove('active');
+                }
+            });
+        }
+        
+        // --- GOOGLE CALENDAR API ---
+        
+        async function initializeGapiClient() {
+            // Init GAPI client
+            await gapi.client.init({
+                apiKey: GOOGLE_API_KEY,
+                discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
+            });
+
+            // Init GIS client
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+                    callback: '', // defined dynamically
+                });
+            } catch (err) {
+                console.error("Error initializing Google Sign-In:", err);
+                authScreen.innerHTML = `
+                    <div class="text-center bg-red-900/50 p-8 rounded-lg border border-red-500">
+                        <h1 class="text-3xl font-bold mb-4 text-red-300">Authentication Error</h1>
+                        <p class="mb-6 text-red-200">Could not initialize Google services. Check ad-blockers or browser privacy settings and refresh.</p>
+                    </div>
+                `;
+                authScreen.style.display = 'flex';
+            }
+        }
+        
+        function handleAuthClick() {
+            if (!tokenClient) {
+                console.error("Token client not initialized.");
+                return;
+            }
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                authScreen.style.display = 'none';
+                await listUpcomingEvents();
+                await renderCalendar();
+                // Start automatic view switching
+                switchView(0, true);
+            };
+
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        async function listUpcomingEvents() {
+            try {
+                const response = await gapi.client.calendar.events.list({
+                    'calendarId': 'primary',
+                    'timeMin': (new Date()).toISOString(),
+                    'showDeleted': false,
+                    'singleEvents': true,
+                    'maxResults': 5,
+                    'orderBy': 'startTime'
+                });
+                
+                const events = response.result.items;
+                eventsContainer.innerHTML = ''; // Clear old events
+                if (!events || events.length === 0) {
+                    eventsContainer.innerHTML = '<p class="text-xl text-gray-300">No upcoming events found.</p>';
+                    return;
+                }
+
+                events.slice(0, 2).forEach((event, index) => {
+                    const { summary, start } = event;
+                    const startDate = new Date(start.dateTime || start.date);
+                    const diffDays = Math.ceil((startDate - new Date()) / (1000 * 60 * 60 * 24));
+                    const relativeTime = diffDays === 0 ? 'Today' : diffDays === 1 ? 'in 1 day' : `in ${diffDays} days`;
+
+                    const eventEl = document.createElement('div');
+                    if (index === 0) {
+                        eventEl.innerHTML = `
+                            <p class="text-xl text-gray-300">${startDate.toLocaleDateString([], {day: 'numeric', month: 'long' })}</p>
+                            <h2 class="text-4xl lg:text-5xl font-bold truncate">${summary}</h2>
+                            <p class="text-2xl text-gray-200">${relativeTime}</p>
+                            <hr class="mt-4 border-t-2 border-white w-1/3">
+                        `;
+                    } else {
+                         eventEl.innerHTML = `
+                            <p class="text-lg text-gray-300">${startDate.toLocaleDateString([], {day: 'numeric', month: 'long' })}</p>
+                            <h2 class="text-3xl lg:text-4xl font-semibold truncate">${summary}</h2>
+                            <p class="text-xl text-gray-200">${relativeTime}</p>
+                        `;
+                    }
+                    eventsContainer.appendChild(eventEl);
+                });
+            } catch(err) {
+                 console.error('Error fetching events:', err);
+                 authScreen.style.display = 'flex'; // Show auth screen on error
+            }
+        }
+        
+        async function renderCalendar() {
+            try {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth();
+
+                calendarTitleEl.textContent = now.toLocaleDateString([], { month: 'long', year: 'numeric' });
+                calendarBodyEl.innerHTML = '';
+
+                const firstDay = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                // Get events for the month
+                const timeMin = new Date(year, month, 1).toISOString();
+                const timeMax = new Date(year, month + 1, 0).toISOString();
+                
+                 const response = await gapi.client.calendar.events.list({
+                    'calendarId': 'primary',
+                    'timeMin': timeMin,
+                    'timeMax': timeMax,
+                    'showDeleted': false,
+                    'singleEvents': true,
+                    'orderBy': 'startTime'
+                });
+                const monthEvents = response.result.items;
+
+                // Create blank cells for days before the 1st
+                for (let i = 0; i < firstDay; i++) {
+                    calendarBodyEl.innerHTML += `<div class="calendar-day other-month p-2"></div>`;
+                }
+
+                // Create cells for each day of the month
+                for (let day = 1; day <= daysInMonth; day++) {
+                    let dayHtml = `<div class="calendar-day p-2 overflow-hidden ${now.getDate() === day ? 'bg-blue-800/50' : ''}">
+                                    <div class="font-semibold text-right">${day}</div>
+                                    <div class="text-xs space-y-1 mt-1">`;
+                    
+                    monthEvents.filter(e => new Date(e.start.dateTime || e.start.date).getDate() === day)
+                               .forEach(e => {
+                                   dayHtml += `<div class="bg-blue-600 rounded px-1 truncate">${e.summary}</div>`;
+                               });
+
+                    dayHtml += `</div></div>`;
+                    calendarBodyEl.innerHTML += dayHtml;
+                }
+            } catch(err) {
+                console.error("Error rendering calendar:", err);
+            }
+        }
+
+
+        // --- EXTERNAL APIS (Weather, Quotes) ---
+
+        function fetchWeather() {
+            if (!navigator.geolocation) {
+                console.error("Geolocation is not supported by this browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=imperial`;
+                
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    const temp = `${Math.round(data.main.temp)}°F`;
+                    const weatherMain = data.weather[0].main;
+                    const icon = getWeatherIcon(weatherMain);
+
+                    quickTempEl.textContent = temp;
+                    quickWeatherIconEl.innerHTML = icon;
+                    nightTempEl.textContent = temp;
+                    nightWeatherIconEl.innerHTML = icon;
+                    
+                    weatherBg.className = `weather-bg weather-${weatherMain.toLowerCase()}`;
+                    
+                } catch(err) {
+                    console.error("Error fetching weather:", err);
+                }
+            });
+        }
+        
+        function getWeatherIcon(weather) {
+            // Simple inline SVG icons for weather
+            const icons = {
+                Clear: `<svg fill="yellow" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`,
+                Clouds: `<svg fill="#E5E7EB" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>`,
+                Rain: `<svg fill="#90BDEE" viewBox="0 0 24 24"><path d="M7 14.93c-1.32-.44-2.43-1.33-3.06-2.58-.63-1.25-.8-2.67-.5-4.08.31-1.41 1.14-2.66 2.31-3.55.78-.6 1.66-1.01 2.59-1.25.93-.24 1.88-.26 2.81-.05 1.13.25 2.18.8 3.03 1.59.85.79 1.48 1.81 1.83 2.94.35 1.13.41 2.33.19 3.49-.22 1.16-.73 2.23-1.48 3.12-1.26 1.49-3.07 2.45-5.01 2.68V15c.61-.2 1.19-.48 1.72-.82.53-.34.99-.76 1.36-1.24.37-.48.66-.99.85-1.54.19-.55.28-1.12.28-1.7 0-1.43-.59-2.73-1.55-3.69-.96-.96-2.26-1.55-3.69-1.55s-2.73.59-3.69 1.55c-.96.96-1.55 2.26-1.55 3.69 0 .28.02.55.06.82H7v.11zM7 16v2H5v2h2v2h2v-2h2v-2H9v-2H7zm12 0v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2z"/></svg>`,
+                Drizzle: `<svg fill="#90BDEE" viewBox="0 0 24 24"><path d="M7 14.93c-1.32-.44-2.43-1.33-3.06-2.58-.63-1.25-.8-2.67-.5-4.08.31-1.41 1.14-2.66 2.31-3.55.78-.6 1.66-1.01 2.59-1.25.93-.24 1.88-.26 2.81-.05 1.13.25 2.18.8 3.03 1.59.85.79 1.48 1.81 1.83 2.94.35 1.13.41 2.33.19 3.49-.22 1.16-.73 2.23-1.48 3.12-1.26 1.49-3.07 2.45-5.01 2.68V15c.61-.2 1.19-.48 1.72-.82.53-.34.99-.76 1.36-1.24.37-.48.66-.99.85-1.54.19-.55.28-1.12.28-1.7 0-1.43-.59-2.73-1.55-3.69-.96-.96-2.26-1.55-3.69-1.55s-2.73.59-3.69 1.55c-.96.96-1.55 2.26-1.55 3.69 0 .28.02.55.06.82H7v.11zM7 16v2H5v2h2v2h2v-2h2v-2H9v-2H7zm12 0v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2z"/></svg>`,
+                Thunderstorm: `<svg fill="#FBBF24" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 16v-5H9l4-7v5h2l-4 7z"/></svg>`,
+                Snow: `<svg fill="white" viewBox="0 0 24 24"><path d="M12 2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 16h2v-2h-2v2zm-2.5-4l1.41-1.41L11.5 14.17V10h1v4.17l1.59-1.58L15.5 14l-3.5 3.5-3.5-3.5zm-3.09-3.59L6.5 9l3.5-3.5 1.41 1.41L9.83 8.5H14v1H9.83l1.58 1.59zm10.18.18L15.5 9l-1.41-1.41L12.5 6.83V11h-1V6.83l-1.59 1.58L8.5 7l3.5-3.5 3.5 3.5z"/></svg>`,
+            };
+            return icons[weather] || icons['Clouds']; // Default to clouds
+        }
+        
+        async function fetchQuote() {
+            const today = new Date().toDateString();
+            const storedQuote = JSON.parse(localStorage.getItem('dailyQuote'));
+
+            if (storedQuote && storedQuote.date === today) {
+                quoteContainer.textContent = `"${storedQuote.content}"`;
+                return;
+            }
+            
+            try {
+                 const response = await fetch('https://api.quotable.io/random');
+                 if (!response.ok) {
+                     throw new Error(`HTTP error! Status: ${response.status}`);
+                 }
+                 const data = await response.json();
+                 quoteContainer.textContent = `"${data.content}"`;
+                 localStorage.setItem('dailyQuote', JSON.stringify({ date: today, content: data.content }));
+            } catch(err) {
+                console.error("Error fetching quote:", err);
+                quoteContainer.textContent = `"The future belongs to those who believe in the beauty of their dreams."`;
+            }
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = initializeApp;
+
+    </script>
+</body>
+</html>
+
