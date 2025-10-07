@@ -160,7 +160,7 @@
         <!-- Header Controls -->
         <div id="header-controls" class="absolute top-4 right-4 z-40 flex items-center gap-4 hidden">
             <select id="calendar-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600"></select>
-            <select id="month-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600"></select>
+            <select id="month-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600 hidden"></select>
             <select id="view-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600">
                 <option value="quick-look-view">Quick Look</option>
                 <option value="monthly-view">Monthly</option>
@@ -259,7 +259,6 @@
         const monthSelector = document.getElementById('month-selector');
         const viewSelector = document.getElementById('view-selector');
         const weatherBg = document.getElementById('weather-bg');
-        // ... (add other DOM element selectors here for brevity)
 
         // --- CORE LOGIC ---
         function initializeApp() {
@@ -272,7 +271,7 @@
             // Event Listeners for controls
             calendarSelector.addEventListener('change', refreshAllData);
             monthSelector.addEventListener('change', refreshAllData);
-            viewSelector.addEventListener('change', (e) => switchView(e.target.value));
+            viewSelector.addEventListener('change', (e) => switchView(e.target.value, true));
             
             setupMonthSelector();
         }
@@ -304,23 +303,33 @@
         }
         
         // --- VIEW MANAGEMENT ---
-        function switchView(viewId, manual = false) {
-             if (manual && viewId !== 'dense-view' && viewId !== 'night-view') {
-                clearInterval(viewInterval);
+        function switchView(viewId, manualSwitch = false) {
+            clearInterval(viewInterval); // Clear any existing timer
+
+            // Only start the auto-cycle timer for specific views
+            if (['quick-look-view', 'monthly-view'].includes(viewId)) {
                 viewInterval = setInterval(() => {
-                    const nextIndex = (['quick-look-view', 'monthly-view'].indexOf(activeViewId) + 1) % 2;
-                    switchView(['quick-look-view', 'monthly-view'][nextIndex]);
+                    const cyclingViews = ['quick-look-view', 'monthly-view'];
+                    const nextIndex = (cyclingViews.indexOf(activeViewId) + 1) % cyclingViews.length;
+                    switchView(cyclingViews[nextIndex]);
                 }, 30000);
-            } else {
-                 clearInterval(viewInterval);
             }
-            if(viewId === 'dense-view'){
-                 clearInterval(viewInterval);
+
+            // Show month selector only for calendar views
+            if (['monthly-view', 'dense-view'].includes(viewId)) {
+                monthSelector.classList.remove('hidden');
+            } else {
+                monthSelector.classList.add('hidden');
             }
 
             activeViewId = viewId;
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
+
+            // If the user manually selected a view, update the dropdown
+            if(manualSwitch){
+                viewSelector.value = viewId;
+            }
         }
 
         function setupMonthSelector() {
@@ -362,7 +371,7 @@
                 headerControls.classList.remove('hidden');
                 await loadCalendarList();
                 await refreshAllData();
-                switchView('quick-look-view', true);
+                switchView('quick-look-view');
             };
             if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({prompt: 'consent'});
@@ -448,6 +457,16 @@
             });
         }
 
+        // Helper function to get contrasting text color (white or black) for a given hex background color
+        function getContrastColor(hex) {
+            if (!hex) return '#FFFFFF';
+            const r = parseInt(hex.substr(1, 2), 16);
+            const g = parseInt(hex.substr(3, 2), 16);
+            const b = parseInt(hex.substr(5, 2), 16);
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return (yiq >= 128) ? '#000000' : '#FFFFFF';
+        }
+
         function renderMonthlyView(dense = false) {
             const bodyId = dense ? 'dense-calendar-body' : 'calendar-body';
             const titleId = dense ? 'dense-calendar-title' : 'calendar-title';
@@ -477,15 +496,19 @@
                 
                 if (dense) {
                     dayEvents.forEach(e => {
-                         dayHtml += `<div class="p-1 rounded mb-1 text-left" style="background-color: ${calendarColors[e.organizer.email] || '#4a5568'}">
+                         const bgColor = calendarColors[e.organizer.email] || '#4a5568';
+                         const textColor = getContrastColor(bgColor);
+                         dayHtml += `<div class="p-1 rounded mb-1 text-left" style="background-color: ${bgColor}; color: ${textColor};">
                                         <p class="font-bold truncate">${e.summary}</p>
-                                        <p class="truncate text-gray-300 text-[10px]">${e.description || ''}</p>
-                                        <p class="truncate text-gray-300 text-[10px]"><strong>By:</strong> ${e.creator.displayName || e.creator.email}</p>
+                                        <p class="truncate text-gray-300 text-[10px]" style="color: ${textColor}d0;">${e.description || ''}</p>
+                                        <p class="truncate text-gray-300 text-[10px]" style="color: ${textColor}d0;"><strong>By:</strong> ${e.creator.displayName || e.creator.email}</p>
                                      </div>`;
                     });
                 } else {
                     dayEvents.forEach(e => {
-                        dayHtml += `<div class="bg-blue-600 rounded px-1 truncate">${e.summary}</div>`;
+                        const bgColor = calendarColors[calendarSelector.value] || '#0369a1';
+                        const textColor = getContrastColor(bgColor);
+                        dayHtml += `<div class="rounded px-1 truncate" style="background-color: ${bgColor}; color: ${textColor};">${e.summary}</div>`;
                     });
                 }
 
