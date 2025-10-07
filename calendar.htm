@@ -117,9 +117,9 @@
         <div id="auth-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-md">
             <div class="text-center">
                 <h1 class="text-3xl font-bold mb-4">Welcome to Your Dynamic Display</h1>
-                <p class="mb-6 text-gray-300">Please connect your Google Calendar to see your events.</p>
-                <button id="authorize-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
-                    Connect Google Calendar
+                <p id="auth-message" class="mb-6 text-gray-300">Please connect your Google Calendar to see your events.</p>
+                <button id="authorize-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>
+                    Initializing...
                 </button>
             </div>
         </div>
@@ -204,12 +204,14 @@
     <script type="module">
         // --- CONFIGURATION ---
         // IMPORTANT: Replace these with your actual credentials.
-        // You can get these from Google Cloud Console and OpenWeatherMap.
-        // In Google Cloud, ensure your API key has the "Google Calendar API" enabled.
-        // For the OAuth Client ID, add your domain (e.g., http://localhost:8000) to the "Authorized JavaScript origins".
         const GOOGLE_CLIENT_ID = '415018106195-utjkai9r1ar3pd6ep5f06kt5ma0tfg0k.apps.googleusercontent.com';
         const GOOGLE_API_KEY = 'AIzaSyCbgUrIug-IwZGHDDYW751tcLG3zV6iMD0';
         const OPENWEATHER_API_KEY = 'e59fe270071be5ed24b5a1ec85ef84c3';
+        // --- TROUBLESHOOTING 403 ERRORS ---
+        // 1. In Google Cloud Console, under "APIs & Services" > "Library", make sure "Google Calendar API" is ENABLED.
+        // 2. Under "APIs & Services" > "Credentials", check your API Key. It should have "Google Calendar API" listed under API restrictions.
+        // 3. Check your OAuth 2.0 Client ID. Under "Authorized JavaScript origins", you MUST add the URL where you are running this file (e.g., "http://localhost:8000", "http://127.0.0.1:8000", or your live domain).
+        
         
         // --- STATE & ELEMENTS ---
         const gapiClient = window.gapi;
@@ -221,6 +223,7 @@
         // --- DOM Elements ---
         const authScreen = document.getElementById('auth-screen');
         const authorizeButton = document.getElementById('authorize-button');
+        const authMessage = document.getElementById('auth-message');
 
         const quickTimeEl = document.getElementById('quick-time');
         const quickDateEl = document.getElementById('quick-date');
@@ -251,13 +254,9 @@
         function initializeApp() {
             // Check for placeholder API keys
             if (GOOGLE_CLIENT_ID.startsWith('YOUR_') || OPENWEATHER_API_KEY.startsWith('YOUR_')) {
-                authScreen.innerHTML = `
-                    <div class="text-center bg-yellow-900/50 p-8 rounded-lg border border-yellow-500">
-                        <h1 class="text-3xl font-bold mb-4 text-yellow-300">Configuration Needed</h1>
-                        <p class="mb-6 text-yellow-200">Please replace the placeholder API keys in the HTML file to enable the application.</p>
-                    </div>
-                `;
-                authScreen.style.display = 'flex';
+                authMessage.textContent = 'Please replace the placeholder API keys in the HTML file to enable the application.';
+                authorizeButton.textContent = 'Configuration Needed';
+                authScreen.querySelector('div').classList.add('bg-yellow-900/50', 'p-8', 'rounded-lg', 'border', 'border-yellow-500');
                 return;
             }
             
@@ -336,6 +335,9 @@
             await gapi.client.init({
                 apiKey: GOOGLE_API_KEY,
                 discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
+            }).catch(err => {
+                 console.error("Error initializing GAPI client:", err);
+                 handleAuthError("Could not initialize Google's API client. This may be due to a misconfigured API Key.");
             });
 
             // Init GIS client
@@ -345,26 +347,32 @@
                     scope: 'https://www.googleapis.com/auth/calendar.readonly',
                     callback: '', // defined dynamically
                 });
+                // If we reach here, initialization is successful
+                authorizeButton.disabled = false;
+                authorizeButton.textContent = 'Connect Google Calendar';
             } catch (err) {
                 console.error("Error initializing Google Sign-In:", err);
-                authScreen.innerHTML = `
-                    <div class="text-center bg-red-900/50 p-8 rounded-lg border border-red-500">
-                        <h1 class="text-3xl font-bold mb-4 text-red-300">Authentication Error</h1>
-                        <p class="mb-6 text-red-200">Could not initialize Google services. Check ad-blockers or browser privacy settings and refresh.</p>
-                    </div>
-                `;
-                authScreen.style.display = 'flex';
+                handleAuthError("Could not initialize Google Sign-In. Check ad-blockers or browser privacy settings and refresh.");
             }
+        }
+
+        function handleAuthError(message) {
+            authMessage.textContent = message;
+            authorizeButton.textContent = 'Initialization Failed';
+            authScreen.querySelector('div').classList.add('bg-red-900/50', 'p-8', 'rounded-lg', 'border', 'border-red-500');
         }
         
         function handleAuthClick() {
             if (!tokenClient) {
-                console.error("Token client not initialized.");
+                console.error("Token client not initialized. Cannot handle auth click.");
                 return;
             }
             tokenClient.callback = async (resp) => {
                 if (resp.error !== undefined) {
-                    throw (resp);
+                    console.error('Google Auth Error:', resp);
+                    handleAuthError('Authentication failed. Please try again.');
+                    authScreen.style.display = 'flex'; // Show auth screen again
+                    return;
                 }
                 authScreen.style.display = 'none';
                 await listUpcomingEvents();
@@ -401,8 +409,8 @@
                 events.slice(0, 2).forEach((event, index) => {
                     const { summary, start } = event;
                     const startDate = new Date(start.dateTime || start.date);
-                    const diffDays = Math.ceil((startDate - new Date()) / (1000 * 60 * 60 * 24));
-                    const relativeTime = diffDays === 0 ? 'Today' : diffDays === 1 ? 'in 1 day' : `in ${diffDays} days`;
+                    const diffDays = Math.ceil((startDate.setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+                    const relativeTime = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Tomorrow' : `in ${diffDays} days`;
 
                     const eventEl = document.createElement('div');
                     if (index === 0) {
@@ -423,6 +431,7 @@
                 });
             } catch(err) {
                  console.error('Error fetching events:', err);
+                 handleAuthError('Could not fetch calendar events. Check API key permissions and ensure you are logged in.');
                  authScreen.style.display = 'flex'; // Show auth screen on error
             }
         }
@@ -492,6 +501,7 @@
                 
                 try {
                     const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Weather API responded with status ${response.status}`);
                     const data = await response.json();
                     
                     const temp = `${Math.round(data.main.temp)}°F`;
