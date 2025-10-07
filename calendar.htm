@@ -18,7 +18,7 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* --- Weather Backgrounds --- */
+        /* --- Animated Weather Backgrounds --- */
         .weather-bg {
             position: fixed;
             top: 0;
@@ -26,45 +26,75 @@
             width: 100%;
             height: 100%;
             z-index: -1;
-            transition: background 1s ease-in-out;
+            transition: background-color 2s ease-in-out, opacity 1.5s ease-in-out;
+            overflow: hidden;
         }
 
-        .weather-clear {
-            background: linear-gradient(to bottom, #87CEEB, #4682B4);
+        .weather-clear-day { background: linear-gradient(to bottom, #87CEEB, #4682B4); }
+        .weather-clear-night { background: linear-gradient(to bottom, #0f172a, #0c0a09); }
+        .weather-clouds-day { background: linear-gradient(to bottom, #B0C4DE, #778899); }
+        .weather-clouds-night { background: linear-gradient(to bottom, #334155, #1e293b); }
+        .weather-rain-day, .weather-drizzle-day, .weather-thunderstorm-day { background: linear-gradient(to bottom, #465875, #1f2937); }
+        .weather-rain-night, .weather-drizzle-night, .weather-thunderstorm-night { background: linear-gradient(to bottom, #1e293b, #0f172a); }
+        .weather-snow-day { background: linear-gradient(to bottom, #e0e0e0, #a0a0a0); }
+        .weather-snow-night { background: linear-gradient(to bottom, #64748b, #334155); }
+        
+        .weather-night-mode { background-color: #0c0a09; }
+
+        .raindrop, .star, .cloud {
+            position: absolute;
+            opacity: 0;
+            animation-duration: 2s;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+        }
+
+        .raindrop {
+            width: 2px;
+            height: 15px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.4));
+            animation-name: fall;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-10vh); opacity: 1; }
+            100% { transform: translateY(110vh); opacity: 1; }
         }
         
-        .weather-clouds {
-            background: linear-gradient(to bottom, #B0C4DE, #778899);
+        .star {
+            width: 2px;
+            height: 2px;
+            background-color: white;
+            border-radius: 50%;
+            animation-name: twinkle;
+            animation-duration: 1.5s;
         }
-
-        .weather-rain, .weather-drizzle, .weather-thunderstorm {
-             background: linear-gradient(to bottom, #465875, #1f2937);
-             overflow: hidden;
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 0.8; }
         }
-
-        .weather-rain::before, .weather-drizzle::before, .weather-thunderstorm::before {
+        
+        .cloud {
+            width: 200px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 100px;
+            animation-name: move-cloud;
+            animation-duration: 60s;
+        }
+        .cloud::before, .cloud::after {
             content: '';
             position: absolute;
-            top: -200%;
-            left: 0;
-            width: 100%;
-            height: 300%;
-            background-image: linear-gradient(transparent, rgba(255,255,255,0.1) 50%, transparent);
-            background-size: 2px 50px;
-            animation: rain-animation 0.5s linear infinite;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
         }
-        
-        @keyframes rain-animation {
-            from { transform: translateY(0); }
-            to { transform: translateY(100%); }
-        }
+        .cloud::before { width: 100px; height: 80px; top: -40px; left: 20px; }
+        .cloud::after { width: 120px; height: 60px; top: -30px; right: 30px; }
 
-        .weather-snow {
-            background: linear-gradient(to bottom, #e0e0e0, #a0a0a0);
-        }
-
-        .weather-night {
-            background-color: #0c0a09;
+        @keyframes move-cloud {
+            0% { transform: translateX(-250px); }
+            100% { transform: translateX(110vw); }
         }
 
         /* --- View Transitions --- */
@@ -98,11 +128,14 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
-        .calendar-day {
-            min-height: 10vh;
-        }
-        .calendar-day.other-month {
-            opacity: 0.4;
+        .calendar-day { min-height: 10vh; }
+        .calendar-day.other-month { opacity: 0.4; }
+        
+        /* Dense View */
+        .dense-day {
+            min-height: 18vh;
+            display: flex;
+            flex-direction: column;
         }
     </style>
 </head>
@@ -124,48 +157,44 @@
             </div>
         </div>
 
+        <!-- Header Controls -->
+        <div id="header-controls" class="absolute top-4 right-4 z-40 flex items-center gap-4 hidden">
+            <select id="calendar-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600"></select>
+            <select id="month-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600"></select>
+            <select id="view-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600">
+                <option value="quick-look-view">Quick Look</option>
+                <option value="monthly-view">Monthly</option>
+                <option value="dense-view">Dense</option>
+            </select>
+        </div>
+
         <!-- Quick Look View -->
         <div id="quick-look-view" class="view flex-col justify-between h-full w-full">
-            <!-- Top Section: Time, Date, Weather -->
             <div class="flex justify-between items-start">
                 <div>
                     <div id="quick-time" class="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight"></div>
                     <div id="quick-date" class="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-300"></div>
                 </div>
                 <div id="quick-weather" class="text-right">
-                    <div class="flex items-center justify-end gap-2">
-                        <div id="quick-weather-icon" class="w-12 h-12 md:w-16 md:h-16"></div>
+                    <div class="flex items-center justify-end gap-4">
+                        <div id="quick-weather-emoji" class="text-5xl md:text-6xl"></div>
                         <div id="quick-temp" class="text-3xl md:text-5xl font-semibold"></div>
                     </div>
                 </div>
             </div>
-
-            <!-- Middle Section: Events & Quote -->
             <div class="flex-grow flex items-center justify-center">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 w-full max-w-6xl">
-                    <div id="events-container" class="space-y-6">
-                        <!-- Events will be injected here -->
-                    </div>
+                    <div id="events-container" class="space-y-6"></div>
                     <div class="flex items-center">
-                         <blockquote id="quote-container" class="text-2xl md:text-3xl lg:text-4xl font-light italic text-gray-200">
-                           "..."
-                        </blockquote>
+                         <blockquote id="quote-container" class="text-2xl md:text-3xl lg:text-4xl font-light italic text-gray-200">"..."</blockquote>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Bottom Section: Hint -->
-            <div class="text-center text-gray-400 text-sm pb-4">
-                Your Google Calendar
             </div>
         </div>
 
         <!-- Monthly View -->
         <div id="monthly-view" class="view flex-col h-full w-full">
-             <div class="flex justify-between items-baseline mb-4">
-                <h1 id="calendar-title" class="text-4xl md:text-5xl font-bold"></h1>
-                <p class="text-gray-300">Your Google Calendar</p>
-            </div>
+            <h1 id="calendar-title" class="text-4xl md:text-5xl font-bold mb-4"></h1>
             <div id="calendar-header" class="calendar-grid">
                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">SUN</div>
                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">MON</div>
@@ -175,385 +204,404 @@
                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">FRI</div>
                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">SAT</div>
             </div>
-            <div id="calendar-body" class="calendar-grid flex-grow">
-                <!-- Calendar days will be injected here -->
+            <div id="calendar-body" class="calendar-grid flex-grow"></div>
+        </div>
+
+        <!-- Dense View -->
+        <div id="dense-view" class="view flex-col h-full w-full">
+            <h1 id="dense-calendar-title" class="text-4xl md:text-5xl font-bold mb-4"></h1>
+            <div id="dense-calendar-header" class="calendar-grid">
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">SUN</div>
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">MON</div>
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">TUE</div>
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">WED</div>
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">THU</div>
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">FRI</div>
+                 <div class="calendar-header p-2 text-center font-semibold text-gray-300">SAT</div>
             </div>
+            <div id="dense-calendar-body" class="calendar-grid flex-grow"></div>
         </div>
 
         <!-- Night View -->
         <div id="night-view" class="view flex-col justify-center items-center h-full w-full text-center">
              <div id="night-time" class="text-7xl md:text-9xl font-bold tracking-tight"></div>
              <div id="night-date" class="text-4xl md:text-6xl font-medium text-gray-300"></div>
-             <div id="night-weather" class="flex items-center justify-center gap-2 mt-8">
+             <div id="night-weather" class="flex items-center justify-center gap-4 mt-8">
+                <div id="night-weather-emoji" class="text-4xl"></div>
                 <div id="night-temp" class="text-2xl md:text-3xl font-semibold"></div>
-                <div id="night-weather-icon" class="w-10 h-10"></div>
             </div>
             <p class="mt-12 text-2xl text-gray-400">Good night!</p>
-        </div>
-
-        <!-- Navigation Arrows -->
-        <div id="nav-left" class="absolute left-0 top-1/2 -translate-y-1/2 z-30 cursor-pointer p-4 opacity-50 hover:opacity-100 transition-opacity">
-            <svg class="w-8 h-8 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-        </div>
-        <div id="nav-right" class="absolute right-0 top-1/2 -translate-y-1/2 z-30 cursor-pointer p-4 opacity-50 hover:opacity-100 transition-opacity">
-            <svg class="w-8 h-8 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </div>
 
     </div>
 
     <script type="module">
         // --- CONFIGURATION ---
-        // IMPORTANT: Replace these with your actual credentials.
         const GOOGLE_CLIENT_ID = '415018106195-utjkai9r1ar3pd6ep5f06kt5ma0tfg0k.apps.googleusercontent.com';
         const GOOGLE_API_KEY = 'AIzaSyA-Gqmhu3nG6jAPE8VFyzWv5Ppdbf1Ot8k';
         const OPENWEATHER_API_KEY = 'e59fe270071be5ed24b5a1ec85ef84c3';
+        const OPENAI_API_KEY = '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';
         
-        // --- FIXING CREDENTIAL ERRORS (403: Forbidden, Invalid Origin) ---
-        // Go to https://console.cloud.google.com/apis/credentials and select your project.
-        
-        // PART 1: CONFIGURE THE OAUTH 2.0 CLIENT ID
-        // 1. Click on your OAuth 2.0 Client ID to edit it.
-        // 2. Under "Authorized JavaScript origins", you must add the EXACT origin.
-        //    - NO wildcards (*).
-        //    - NO paths or trailing slashes (/).
-        //    - Examples of CORRECT entries:
-        //        - https://glitchy-m.github.io
-        //        - http://localhost:8000
-        //        - http://127.0.0.1:5500
-        
-        // PART 2: CONFIGURE THE API KEY
-        // 1. Click on your API Key to edit it.
-        // 2. Under "API restrictions", ensure "Google Calendar API" is enabled.
-        // 3. Under "Application restrictions", select "HTTP referrers (web sites)".
-        // 4. Add referrers that CAN include wildcards. This is less strict.
-        //    - Examples of CORRECT entries:
-        //        - glitchy-m.github.io/*
-        //        - localhost:*
-        //        - 127.0.0.1:*
-        // 5. Click SAVE on both credentials. It may take a minute to update.
-
-        
-        // --- STATE & ELEMENTS ---
+        // --- STATE ---
         let gapiInited = false;
-        const views = ['quick-look-view', 'monthly-view'];
-        let currentViewIndex = 0;
+        let activeViewId = 'quick-look-view';
         let viewInterval;
         let tokenClient;
+        let currentWeatherData = {};
+        let currentEvents = [];
+        let calendarColors = {};
 
         // --- DOM Elements ---
         const authScreen = document.getElementById('auth-screen');
         const authorizeButton = document.getElementById('authorize-button');
-        const authMessage = document.getElementById('auth-message');
-        const quickTimeEl = document.getElementById('quick-time');
-        const quickDateEl = document.getElementById('quick-date');
-        const quickWeatherIconEl = document.getElementById('quick-weather-icon');
-        const quickTempEl = document.getElementById('quick-temp');
-        const eventsContainer = document.getElementById('events-container');
-        const quoteContainer = document.getElementById('quote-container');
-        const calendarTitleEl = document.getElementById('calendar-title');
-        const calendarBodyEl = document.getElementById('calendar-body');
-        const nightViewEl = document.getElementById('night-view');
-        const nightTimeEl = document.getElementById('night-time');
-        const nightDateEl = document.getElementById('night-date');
-        const nightWeatherIconEl = document.getElementById('night-weather-icon');
-        const nightTempEl = document.getElementById('night-temp');
+        const headerControls = document.getElementById('header-controls');
+        const calendarSelector = document.getElementById('calendar-selector');
+        const monthSelector = document.getElementById('month-selector');
+        const viewSelector = document.getElementById('view-selector');
         const weatherBg = document.getElementById('weather-bg');
-        const navLeft = document.getElementById('nav-left');
-        const navRight = document.getElementById('nav-right');
-
+        // ... (add other DOM element selectors here for brevity)
 
         // --- CORE LOGIC ---
-
         function initializeApp() {
-            // Check for placeholder API keys
-            if (GOOGLE_CLIENT_ID.startsWith('YOUR_') || OPENWEATHER_API_KEY.startsWith('YOUR_')) {
-                authMessage.textContent = 'Please replace the placeholder API keys in the HTML file to enable the application.';
-                authorizeButton.textContent = 'Configuration Needed';
-                authScreen.querySelector('div').classList.add('bg-yellow-900/50', 'p-8', 'rounded-lg', 'border', 'border-yellow-500');
-                return;
-            }
-            
             updateTimeAndDate();
             setInterval(updateTimeAndDate, 1000);
-            fetchWeather();
-            fetchQuote();
-            setInterval(fetchWeather, 15 * 60 * 1000);
+            fetchWeatherAndQuote();
+            setInterval(fetchWeatherAndQuote, 15 * 60 * 1000); // every 15 mins
             gapi.load('client', initializeGapiClient);
-            navLeft.addEventListener('click', () => switchView(currentViewIndex - 1, true));
-            navRight.addEventListener('click', () => switchView(currentViewIndex + 1, true));
-            authorizeButton.addEventListener('click', handleAuthClick);
+            
+            // Event Listeners for controls
+            calendarSelector.addEventListener('change', refreshAllData);
+            monthSelector.addEventListener('change', refreshAllData);
+            viewSelector.addEventListener('change', (e) => switchView(e.target.value));
+            
+            setupMonthSelector();
         }
 
         // --- TIME, DATE & MODE SWITCHING ---
-
         function updateTimeAndDate() {
             const now = new Date();
             const hours = now.getHours();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' AM', '').replace(' PM', '');
+            const isNight = hours >= 22 || hours < 5;
+            
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
             const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'long' });
 
-            if (hours >= 22 || hours < 5) {
-                if (!nightViewEl.classList.contains('active')) {
-                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                    nightViewEl.classList.add('active');
-                    weatherBg.className = 'weather-bg weather-night';
-                    [navLeft, navRight].forEach(nav => nav.style.display = 'none');
+            if (isNight) {
+                if (activeViewId !== 'night-view') {
+                    switchView('night-view');
+                    updateWeatherEffects(true);
                 }
-                nightTimeEl.textContent = timeString;
-                nightDateEl.textContent = dateString;
+                document.getElementById('night-time').textContent = timeString;
+                document.getElementById('night-date').textContent = dateString;
             } else {
-                if (nightViewEl.classList.contains('active')) {
-                    nightViewEl.classList.remove('active');
-                    switchView(currentViewIndex, true);
-                    fetchWeather();
+                if (activeViewId === 'night-view') {
+                    switchView(viewSelector.value); // Return to selected view
+                    updateWeatherEffects(false);
                 }
-                 [navLeft, navRight].forEach(nav => nav.style.display = 'block');
-                quickTimeEl.textContent = timeString;
-                quickDateEl.textContent = dateString;
+                document.getElementById('quick-time').textContent = timeString;
+                document.getElementById('quick-date').textContent = dateString;
             }
         }
         
         // --- VIEW MANAGEMENT ---
-        
-        function switchView(index, manual = false) {
-            if (manual) {
+        function switchView(viewId, manual = false) {
+             if (manual && viewId !== 'dense-view' && viewId !== 'night-view') {
                 clearInterval(viewInterval);
-                viewInterval = setInterval(() => switchView(currentViewIndex + 1), 30000);
+                viewInterval = setInterval(() => {
+                    const nextIndex = (['quick-look-view', 'monthly-view'].indexOf(activeViewId) + 1) % 2;
+                    switchView(['quick-look-view', 'monthly-view'][nextIndex]);
+                }, 30000);
+            } else {
+                 clearInterval(viewInterval);
             }
-            
-            const newIndex = (index + views.length) % views.length;
-            currentViewIndex = newIndex;
-            
-            document.querySelectorAll('.view').forEach((view) => {
-                const viewId = views[newIndex];
-                if (view.id === viewId) {
-                    view.classList.add('active');
-                } else {
-                    view.classList.remove('active');
-                }
+            if(viewId === 'dense-view'){
+                 clearInterval(viewInterval);
+            }
+
+            activeViewId = viewId;
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function setupMonthSelector() {
+            const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const currentMonth = new Date().getMonth();
+            months.forEach((month, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = month;
+                if (index === currentMonth) option.selected = true;
+                monthSelector.appendChild(option);
             });
         }
         
         // --- GOOGLE CALENDAR API ---
-        
         async function initializeGapiClient() {
             try {
                 await gapi.client.init({
                     apiKey: GOOGLE_API_KEY,
                     discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
                 });
-                gapiInited = true; // Mark GAPI as successfully initialized
-            } catch (err) {
-                 console.error("Error initializing GAPI client:", err);
-                 handleAuthError("Could not initialize Google's API client. Your API Key is likely invalid or misconfigured. See comments in the HTML for help.");
-                 return; // Stop initialization if GAPI fails
-            }
-
-            try {
+                gapiInited = true;
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: GOOGLE_CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+                    scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly',
                     callback: '',
                 });
                 authorizeButton.disabled = false;
                 authorizeButton.textContent = 'Connect Google Calendar';
             } catch (err) {
-                console.error("Error initializing Google Sign-In:", err);
-                handleAuthError("Could not initialize Google Sign-In. Check ad-blockers or browser privacy settings and refresh.");
+                console.error("GAPI/Token Client Error:", err);
             }
-        }
-
-        function handleAuthError(message) {
-            authMessage.textContent = message;
-            authorizeButton.textContent = 'Initialization Failed';
-            authScreen.querySelector('div').classList.add('bg-red-900/50', 'p-8', 'rounded-lg', 'border', 'border-red-500');
         }
         
-        function handleAuthClick() {
-            if (!tokenClient) {
-                console.error("Token client not initialized. Cannot handle auth click.");
-                return;
-            }
-            tokenClient.callback = async (resp) => {
-                if (resp.error !== undefined) {
-                    console.error('Google Auth Error:', resp);
-                    handleAuthError('Authentication failed. Please try again.');
-                    authScreen.style.display = 'flex';
-                    return;
-                }
+        authorizeButton.addEventListener('click', () => {
+             tokenClient.callback = async (resp) => {
+                if (resp.error) throw resp;
                 authScreen.style.display = 'none';
-                await listUpcomingEvents();
-                await renderCalendar();
-                switchView(0, true);
+                headerControls.classList.remove('hidden');
+                await loadCalendarList();
+                await refreshAllData();
+                switchView('quick-look-view', true);
             };
-
             if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({prompt: 'consent'});
             } else {
                 tokenClient.requestAccessToken({prompt: ''});
             }
+        });
+
+        async function refreshAllData() {
+            await fetchEventsForMonth();
+            renderAllViews();
         }
 
-        async function listUpcomingEvents() {
-            if (!gapiInited) {
-                console.error("Cannot list events: GAPI client not initialized.");
-                return;
-            }
+        async function loadCalendarList() {
+            const response = await gapi.client.calendar.calendarList.list();
+            calendarSelector.innerHTML = '';
+            response.result.items.forEach(cal => {
+                const option = document.createElement('option');
+                option.value = cal.id;
+                option.textContent = cal.summary;
+                if (cal.primary) option.selected = true;
+                calendarSelector.appendChild(option);
+                calendarColors[cal.id] = cal.backgroundColor;
+            });
+        }
+
+        async function fetchEventsForMonth() {
+            const calendarId = calendarSelector.value;
+            const selectedMonth = parseInt(monthSelector.value);
+            const year = new Date().getFullYear();
+            const timeMin = new Date(year, selectedMonth, 1).toISOString();
+            const timeMax = new Date(year, selectedMonth + 1, 0).toISOString();
+
             try {
                 const response = await gapi.client.calendar.events.list({
-                    'calendarId': 'primary',
-                    'timeMin': (new Date()).toISOString(),
-                    'showDeleted': false,
-                    'singleEvents': true,
-                    'maxResults': 5,
-                    'orderBy': 'startTime'
+                    'calendarId': calendarId,
+                    'timeMin': timeMin, 'timeMax': timeMax,
+                    'showDeleted': false, 'singleEvents': true, 'orderBy': 'startTime'
                 });
-                
-                const events = response.result.items;
-                eventsContainer.innerHTML = '';
-                if (!events || events.length === 0) {
-                    eventsContainer.innerHTML = '<p class="text-xl text-gray-300">No upcoming events found.</p>';
-                    return;
-                }
-
-                events.slice(0, 2).forEach((event, index) => {
-                    const { summary, start } = event;
-                    const startDate = new Date(start.dateTime || start.date);
-                    const diffDays = Math.ceil((startDate.setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
-                    const relativeTime = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Tomorrow' : `in ${diffDays} days`;
-
-                    const eventEl = document.createElement('div');
-                    if (index === 0) {
-                        eventEl.innerHTML = `
-                            <p class="text-xl text-gray-300">${startDate.toLocaleDateString([], {day: 'numeric', month: 'long' })}</p>
-                            <h2 class="text-4xl lg:text-5xl font-bold truncate">${summary}</h2>
-                            <p class="text-2xl text-gray-200">${relativeTime}</p>
-                            <hr class="mt-4 border-t-2 border-white w-1/3">
-                        `;
-                    } else {
-                         eventEl.innerHTML = `
-                            <p class="text-lg text-gray-300">${startDate.toLocaleDateString([], {day: 'numeric', month: 'long' })}</p>
-                            <h2 class="text-3xl lg:text-4xl font-semibold truncate">${summary}</h2>
-                            <p class="text-xl text-gray-200">${relativeTime}</p>
-                        `;
-                    }
-                    eventsContainer.appendChild(eventEl);
-                });
+                currentEvents = response.result.items;
             } catch(err) {
                  console.error('Error fetching events:', err);
-                 handleAuthError('Could not fetch calendar events. Check API key permissions and ensure you are logged in.');
-                 authScreen.style.display = 'flex';
+                 currentEvents = [];
             }
         }
         
-        async function renderCalendar() {
-             if (!gapiInited) {
-                console.error("Cannot render calendar: GAPI client not initialized.");
-                return;
-            }
-            try {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = now.getMonth();
-
-                calendarTitleEl.textContent = now.toLocaleDateString([], { month: 'long', year: 'numeric' });
-                calendarBodyEl.innerHTML = '';
-
-                const firstDay = new Date(year, month, 1).getDay();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-                const timeMin = new Date(year, month, 1).toISOString();
-                const timeMax = new Date(year, month + 1, 0).toISOString();
-                
-                const response = await gapi.client.calendar.events.list({
-                    'calendarId': 'primary', 'timeMin': timeMin, 'timeMax': timeMax,
-                    'showDeleted': false, 'singleEvents': true, 'orderBy': 'startTime'
-                });
-                const monthEvents = response.result.items;
-
-                for (let i = 0; i < firstDay; i++) {
-                    calendarBodyEl.innerHTML += `<div class="calendar-day other-month p-2"></div>`;
-                }
-
-                for (let day = 1; day <= daysInMonth; day++) {
-                    let dayHtml = `<div class="calendar-day p-2 overflow-hidden ${now.getDate() === day ? 'bg-blue-800/50' : ''}">
-                                    <div class="font-semibold text-right">${day}</div>
-                                    <div class="text-xs space-y-1 mt-1">`;
-                    
-                    monthEvents.filter(e => new Date(e.start.dateTime || e.start.date).getDate() === day)
-                               .forEach(e => {
-                                   dayHtml += `<div class="bg-blue-600 rounded px-1 truncate">${e.summary}</div>`;
-                               });
-                    dayHtml += `</div></div>`;
-                    calendarBodyEl.innerHTML += dayHtml;
-                }
-            } catch(err) {
-                console.error("Error rendering calendar:", err);
-            }
+        function renderAllViews() {
+            renderQuickLook();
+            renderMonthlyView();
+            renderDenseView();
         }
 
+        function renderQuickLook() {
+            const eventsContainer = document.getElementById('events-container');
+            const now = new Date();
+            const upcomingEvents = currentEvents
+                .filter(e => new Date(e.start.dateTime || e.start.date) >= now)
+                .slice(0, 2);
+
+            eventsContainer.innerHTML = '';
+            if (upcomingEvents.length === 0) {
+                 eventsContainer.innerHTML = '<p class="text-xl text-gray-300">No upcoming events this month.</p>';
+                 return;
+            }
+            upcomingEvents.forEach((event, index) => {
+                 const { summary, start } = event;
+                 const startDate = new Date(start.dateTime || start.date);
+                 const diffDays = Math.ceil((startDate.setHours(0,0,0,0) - now.setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+                 const relativeTime = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Tomorrow' : `in ${diffDays} days`;
+
+                 const eventEl = document.createElement('div');
+                 if (index === 0) {
+                     eventEl.innerHTML = `<p class="text-xl text-gray-300">${startDate.toLocaleDateString([], {day: 'numeric', month: 'long' })}</p>
+                                          <h2 class="text-4xl lg:text-5xl font-bold truncate">${summary}</h2>
+                                          <p class="text-2xl text-gray-200">${relativeTime}</p>
+                                          <hr class="mt-4 border-t-2 border-white w-1/3">`;
+                 } else {
+                      eventEl.innerHTML = `<p class="text-lg text-gray-300">${startDate.toLocaleDateString([], {day: 'numeric', month: 'long' })}</p>
+                                           <h2 class="text-3xl lg:text-4xl font-semibold truncate">${summary}</h2>
+                                           <p class="text-xl text-gray-200">${relativeTime}</p>`;
+                 }
+                 eventsContainer.appendChild(eventEl);
+            });
+        }
+
+        function renderMonthlyView(dense = false) {
+            const bodyId = dense ? 'dense-calendar-body' : 'calendar-body';
+            const titleId = dense ? 'dense-calendar-title' : 'calendar-title';
+            const dayClass = dense ? 'dense-day' : '';
+
+            const calendarBodyEl = document.getElementById(bodyId);
+            const titleEl = document.getElementById(titleId);
+
+            const year = new Date().getFullYear();
+            const month = parseInt(monthSelector.value);
+            
+            titleEl.textContent = new Date(year, month).toLocaleDateString([], { month: 'long', year: 'numeric' });
+            calendarBodyEl.innerHTML = '';
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                calendarBodyEl.innerHTML += `<div class="calendar-day other-month p-2"></div>`;
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayEvents = currentEvents.filter(e => new Date(e.start.dateTime || e.start.date).getDate() === day);
+                let dayHtml = `<div class="calendar-day p-2 overflow-hidden ${dayClass} ${new Date().getDate() === day && new Date().getMonth() === month ? 'bg-blue-800/50' : ''}">
+                                <div class="font-semibold text-right">${day}</div>
+                                <div class="text-xs space-y-1 mt-1 flex-grow overflow-y-auto">`;
+                
+                if (dense) {
+                    dayEvents.forEach(e => {
+                         dayHtml += `<div class="p-1 rounded mb-1 text-left" style="background-color: ${calendarColors[e.organizer.email] || '#4a5568'}">
+                                        <p class="font-bold truncate">${e.summary}</p>
+                                        <p class="truncate text-gray-300 text-[10px]">${e.description || ''}</p>
+                                        <p class="truncate text-gray-300 text-[10px]"><strong>By:</strong> ${e.creator.displayName || e.creator.email}</p>
+                                     </div>`;
+                    });
+                } else {
+                    dayEvents.forEach(e => {
+                        dayHtml += `<div class="bg-blue-600 rounded px-1 truncate">${e.summary}</div>`;
+                    });
+                }
+
+                dayHtml += `</div></div>`;
+                calendarBodyEl.innerHTML += dayHtml;
+            }
+        }
+        
+        function renderDenseView() {
+            renderMonthlyView(true);
+        }
 
         // --- EXTERNAL APIS (Weather, Quotes) ---
-
-        function fetchWeather() {
-            if (!navigator.geolocation) {
-                console.error("Geolocation is not supported by this browser.");
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(async (position) => {
+        async function fetchWeatherAndQuote() {
+             if (!navigator.geolocation) return;
+             navigator.geolocation.getCurrentPosition(async (position) => {
                 const { latitude, longitude } = position.coords;
                 const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=imperial`;
                 try {
                     const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Weather API responded with status ${response.status}`);
                     const data = await response.json();
-                    const temp = `${Math.round(data.main.temp)}°F`;
-                    const weatherMain = data.weather[0].main;
-                    const icon = getWeatherIcon(weatherMain);
-                    quickTempEl.textContent = temp;
-                    quickWeatherIconEl.innerHTML = icon;
-                    nightTempEl.textContent = temp;
-                    nightWeatherIconEl.innerHTML = icon;
-                    weatherBg.className = `weather-bg weather-${weatherMain.toLowerCase()}`;
-                } catch(err) {
-                    console.error("Error fetching weather:", err);
-                }
+                    currentWeatherData = {
+                        temp: `${Math.round(data.main.temp)}°F`,
+                        main: data.weather[0].main,
+                        description: data.weather[0].description
+                    };
+                    updateWeatherUI();
+                    updateWeatherEffects(document.getElementById('night-view').classList.contains('active'));
+                    fetchAIQuote();
+                } catch(err) { console.error("Error fetching weather:", err); }
             });
         }
         
-        function getWeatherIcon(weather) {
-            const icons = {
-                Clear: `<svg fill="yellow" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`,
-                Clouds: `<svg fill="#E5E7EB" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>`,
-                Rain: `<svg fill="#90BDEE" viewBox="0 0 24 24"><path d="M7 14.93c-1.32-.44-2.43-1.33-3.06-2.58-.63-1.25-.8-2.67-.5-4.08.31-1.41 1.14-2.66 2.31-3.55.78-.6 1.66-1.01 2.59-1.25.93-.24 1.88-.26 2.81-.05 1.13.25 2.18.8 3.03 1.59.85.79 1.48 1.81 1.83 2.94.35 1.13.41 2.33.19 3.49-.22 1.16-.73 2.23-1.48 3.12-1.26 1.49-3.07 2.45-5.01 2.68V15c.61-.2 1.19-.48 1.72-.82.53-.34.99-.76 1.36-1.24.37-.48.66-.99.85-1.54.19-.55.28-1.12.28-1.7 0-1.43-.59-2.73-1.55-3.69-.96-.96-2.26-1.55-3.69-1.55s-2.73.59-3.69 1.55c-.96.96-1.55 2.26-1.55 3.69 0 .28.02.55.06.82H7v.11zM7 16v2H5v2h2v2h2v-2h2v-2H9v-2H7zm12 0v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2z"/></svg>`,
-                Drizzle: `<svg fill="#90BDEE" viewBox="0 0 24 24"><path d="M7 14.93c-1.32-.44-2.43-1.33-3.06-2.58-.63-1.25-.8-2.67-.5-4.08.31-1.41 1.14-2.66 2.31-3.55.78-.6 1.66-1.01 2.59-1.25.93-.24 1.88-.26 2.81-.05 1.13.25 2.18.8 3.03 1.59.85.79 1.48 1.81 1.83 2.94.35 1.13.41 2.33.19 3.49-.22 1.16-.73 2.23-1.48 3.12-1.26 1.49-3.07 2.45-5.01 2.68V15c.61-.2 1.19-.48 1.72-.82.53-.34.99-.76 1.36-1.24.37-.48.66-.99.85-1.54.19-.55.28-1.12.28-1.7 0-1.43-.59-2.73-1.55-3.69-.96-.96-2.26-1.55-3.69-1.55s-2.73.59-3.69 1.55c-.96.96-1.55 2.26-1.55 3.69 0 .28.02.55.06.82H7v.11zM7 16v2H5v2h2v2h2v-2h2v-2H9v-2H7zm12 0v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2z"/></svg>`,
-                Thunderstorm: `<svg fill="#FBBF24" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 16v-5H9l4-7v5h2l-4 7z"/></svg>`,
-                Snow: `<svg fill="white" viewBox="0 0 24 24"><path d="M12 2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 16h2v-2h-2v2zm-2.5-4l1.41-1.41L11.5 14.17V10h1v4.17l1.59-1.58L15.5 14l-3.5 3.5-3.5-3.5zm-3.09-3.59L6.5 9l3.5-3.5 1.41 1.41L9.83 8.5H14v1H9.83l1.58 1.59zm10.18.18L15.5 9l-1.41-1.41L12.5 6.83V11h-1V6.83l-1.59 1.58L8.5 7l3.5-3.5 3.5 3.5z"/></svg>`,
-            };
-            return icons[weather] || icons['Clouds'];
+        function updateWeatherUI() {
+            const emoji = getWeatherEmoji(currentWeatherData.main);
+            document.getElementById('quick-temp').textContent = currentWeatherData.temp;
+            document.getElementById('quick-weather-emoji').textContent = emoji;
+            document.getElementById('night-temp').textContent = currentWeatherData.temp;
+            document.getElementById('night-weather-emoji').textContent = emoji;
+        }
+
+        function updateWeatherEffects(isNight) {
+            const weatherType = (currentWeatherData.main || 'clear').toLowerCase();
+            weatherBg.className = `weather-bg weather-${weatherType}-${isNight ? 'night' : 'day'}`;
+            
+            // Clear old effects
+            const oldEffects = weatherBg.querySelectorAll('.raindrop, .star, .cloud');
+            oldEffects.forEach(el => el.remove());
+            
+            // Add new effects
+            if (['rain', 'drizzle', 'thunderstorm'].includes(weatherType)) {
+                for(let i=0; i<50; i++) addEffect('raindrop');
+            } else if (isNight) {
+                for(let i=0; i<100; i++) addEffect('star');
+            } else if (weatherType.includes('cloud')) {
+                for(let i=0; i<5; i++) addEffect('cloud');
+            }
+        }
+
+        function addEffect(type) {
+            const el = document.createElement('div');
+            el.className = type;
+            el.style.left = `${Math.random() * 100}vw`;
+            const duration = 2 + Math.random() * 3;
+            const delay = Math.random() * 5;
+            el.style.animationDuration = `${duration}s`;
+            el.style.animationDelay = `${delay}s`;
+
+            if (type === 'cloud') {
+                 el.style.top = `${Math.random() * 30}vh`;
+                 el.style.animationDuration = `${40 + Math.random() * 40}s`;
+            } else if (type === 'raindrop') {
+                 el.style.animationDuration = `${0.5 + Math.random() * 0.5}s`;
+            }
+            weatherBg.appendChild(el);
+        }
+
+        function getWeatherEmoji(weather) {
+            const map = { Clear: '☀️', Clouds: '☁️', Rain: '🌧️', Drizzle: '💧', Thunderstorm: '⛈️', Snow: '❄️' };
+            return map[weather] || '🌫️'; // Default for mist, fog etc.
         }
         
-        async function fetchQuote() {
-            const today = new Date().toDateString();
-            const storedQuote = JSON.parse(localStorage.getItem('dailyQuote'));
-            if (storedQuote && storedQuote.date === today) {
-                quoteContainer.textContent = `"${storedQuote.content}"`;
-                return;
-            }
+        async function fetchAIQuote() {
+            const prompt = `Generate a short, insightful, one-sentence quote.
+                           The current time is ${new Date().toLocaleTimeString()}.
+                           The weather is ${currentWeatherData.description || 'clear'}.
+                           My next calendar event is: ${currentEvents[0]?.summary || 'nothing scheduled'}.
+                           Keep the quote generic but inspired by these elements.`;
             try {
-                 const response = await fetch('https://api.quotable.io/random');
-                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                 const data = await response.json();
-                 quoteContainer.textContent = `"${data.content}"`;
-                 localStorage.setItem('dailyQuote', JSON.stringify({ date: today, content: data.content }));
-            } catch(err) {
-                console.error("Error fetching quote:", err);
-                quoteContainer.textContent = `"The future belongs to those who believe in the beauty of their dreams."`;
+                const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${OPENAI_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: "gpt-3.5-turbo",
+                        messages: [{ role: "user", content: prompt }],
+                        temperature: 0.7,
+                        max_tokens: 40,
+                    })
+                });
+                const data = await response.json();
+                let quote = data.choices[0].message.content.trim();
+                if (quote.startsWith('"') && quote.endsWith('"')) {
+                    quote = quote.substring(1, quote.length - 1);
+                }
+                document.getElementById('quote-container').textContent = `"${quote}"`;
+            } catch (err) {
+                console.error("Error fetching AI quote:", err);
+                document.getElementById('quote-container').textContent = `"The future belongs to those who believe in the beauty of their dreams."`;
             }
         }
 
         // --- INITIALIZATION ---
         window.onload = initializeApp;
-
     </script>
 </body>
 </html>
