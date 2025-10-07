@@ -139,11 +139,16 @@
         .calendar-day { min-height: 10vh; }
         .calendar-day.other-month { opacity: 0.4; }
         
-        /* Dense View */
+        /* --- Dense View --- */
         .dense-day {
             min-height: 18vh;
             display: flex;
             flex-direction: column;
+        }
+
+        /* --- Progress Bar --- */
+        #progress-bar {
+            transition: width 0.5s ease-out;
         }
     </style>
 </head>
@@ -154,14 +159,51 @@
     <!-- Main Container -->
     <div class="relative flex flex-col h-full p-4 sm:p-6 md:p-8 lg:p-12">
         
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm transition-opacity duration-500">
+            <div class="w-full max-w-md text-center">
+                <h1 class="text-3xl font-bold mb-4">Initializing Display...</h1>
+                <div class="w-full bg-gray-700 rounded-full h-2.5 mb-2">
+                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="loading-message" class="text-gray-300">Getting things ready...</p>
+            </div>
+        </div>
+
         <!-- Auth Screen -->
-        <div id="auth-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-md">
+        <div id="auth-screen" class="absolute inset-0 z-40 flex items-center justify-center bg-gray-900/80 backdrop-blur-md hidden">
             <div class="text-center">
                 <h1 class="text-3xl font-bold mb-4">Welcome to Your Dynamic Display</h1>
                 <p id="auth-message" class="mb-6 text-gray-300">Please connect your Google Calendar to see your events.</p>
                 <button id="authorize-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>
                     Initializing...
                 </button>
+            </div>
+        </div>
+
+        <!-- Master Controls Toggle -->
+        <button id="toggle-controls-btn" class="absolute top-4 left-4 z-50 text-2xl p-2 bg-gray-800/50 rounded-full hover:bg-gray-700/70 transition-colors">
+            ⚙️
+        </button>
+
+        <!-- Debug Panel -->
+        <div id="debug-panel" class="absolute top-16 left-4 z-50 bg-gray-800/80 backdrop-blur-md p-4 rounded-lg space-y-3 hidden">
+            <h3 class="font-bold text-lg">Debug Controls</h3>
+            <div>
+                <label for="debug-time" class="block text-sm font-medium">Override Time (Hour)</label>
+                <input type="range" id="debug-time" min="0" max="23" step="1" class="w-full">
+            </div>
+             <div>
+                <label for="debug-weather" class="block text-sm font-medium">Override Weather</label>
+                <select id="debug-weather" class="w-full bg-gray-700 text-white rounded-md p-1 border border-gray-600">
+                    <option value="">Live Weather</option>
+                    <option value="Clear">Clear</option>
+                    <option value="Clouds">Clouds</option>
+                    <option value="Rain">Rain</option>
+                    <option value="Drizzle">Drizzle</option>
+                    <option value="Thunderstorm">Thunderstorm</option>
+                    <option value="Snow">Snow</option>
+                </select>
             </div>
         </div>
 
@@ -269,8 +311,15 @@
         let currentWeatherData = {};
         let currentEvents = [];
         let calendarColors = {};
+        let debugMode = {
+            time: null,
+            weather: null
+        };
 
         // --- DOM Elements ---
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressBar = document.getElementById('progress-bar');
+        const loadingMessage = document.getElementById('loading-message');
         const authScreen = document.getElementById('auth-screen');
         const authorizeButton = document.getElementById('authorize-button');
         const headerControls = document.getElementById('header-controls');
@@ -278,40 +327,58 @@
         const monthSelector = document.getElementById('month-selector');
         const viewSelector = document.getElementById('view-selector');
         const weatherBg = document.getElementById('weather-bg');
+        const toggleControlsBtn = document.getElementById('toggle-controls-btn');
+        const debugPanel = document.getElementById('debug-panel');
 
         // --- CORE LOGIC ---
         function initializeApp() {
+            setupDebugControls();
             updateTimeAndDate();
             setInterval(updateTimeAndDate, 1000);
-            fetchWeatherAndQuote();
-            setInterval(fetchWeatherAndQuote, 15 * 60 * 1000); // every 15 mins
             gapi.load('client', initializeGapiClient);
             
             calendarSelector.addEventListener('change', refreshAllData);
             monthSelector.addEventListener('change', refreshAllData);
             viewSelector.addEventListener('change', (e) => switchView(e.target.value, true));
+            toggleControlsBtn.addEventListener('click', () => {
+                headerControls.classList.toggle('hidden');
+                debugPanel.classList.toggle('hidden');
+            });
             
             setupMonthSelector();
+        }
+
+        function updateLoadingProgress(percent, message) {
+            progressBar.style.width = `${percent}%`;
+            loadingMessage.textContent = message;
         }
 
         // --- TIME, DATE & MODE SWITCHING ---
         function updateTimeAndDate() {
             const now = new Date();
+            // Allow debug override
+            if (debugMode.time !== null) {
+                now.setHours(debugMode.time);
+            }
+
             const hours = now.getHours();
             const isNight = hours >= 22 || hours < 5;
             
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
             const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'long' });
 
-            if (isNight) {
+            if (isNight && debugMode.time === null) { // Only auto-switch if not debugging time
                 if (activeViewId !== 'night-view') switchView('night-view');
-                document.getElementById('night-time').textContent = timeString;
-                document.getElementById('night-date').textContent = dateString;
-            } else {
-                if (activeViewId === 'night-view') switchView(viewSelector.value);
-                document.getElementById('quick-time').textContent = timeString;
-                document.getElementById('quick-date').textContent = dateString;
+                updateWeatherEffects(true);
+            } else if (activeViewId === 'night-view' && !isNight && debugMode.time === null) {
+                switchView(viewSelector.value);
+                updateWeatherEffects(false);
             }
+
+            document.getElementById('night-time').textContent = timeString;
+            document.getElementById('night-date').textContent = dateString;
+            document.getElementById('quick-time').textContent = timeString;
+            document.getElementById('quick-date').textContent = dateString;
         }
         
         // --- VIEW MANAGEMENT ---
@@ -360,6 +427,7 @@
         // --- GOOGLE CALENDAR API & AUTH ---
         async function initializeGapiClient() {
             try {
+                updateLoadingProgress(10, 'Initializing Google Services...');
                 await gapi.client.init({
                     apiKey: GOOGLE_API_KEY,
                     discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
@@ -376,13 +444,17 @@
                     const token = JSON.parse(storedToken);
                     if (token.expires_at > Date.now()) {
                         gapi.client.setToken(token);
-                        handleSuccessfulLogin();
+                        await handleSuccessfulLogin();
                     } else {
                         localStorage.removeItem('googleOauthToken');
+                        authScreen.classList.remove('hidden');
                         authorizeButton.disabled = false;
                         authorizeButton.textContent = 'Connect Google Calendar';
                     }
                 } else {
+                    loadingScreen.style.opacity = '0';
+                    setTimeout(() => loadingScreen.classList.add('hidden'), 500);
+                    authScreen.classList.remove('hidden');
                     authorizeButton.disabled = false;
                     authorizeButton.textContent = 'Connect Google Calendar';
                 }
@@ -399,15 +471,31 @@
         }
 
         async function handleSuccessfulLogin() {
-            authScreen.style.display = 'none';
-            headerControls.classList.remove('hidden');
+            authScreen.classList.add('hidden');
+            updateLoadingProgress(30, 'Authentication successful...');
+            
             await loadCalendarList();
+            updateLoadingProgress(50, 'Loading your calendars...');
+            
             await refreshAllData();
+            updateLoadingProgress(70, 'Fetching events...');
+
+            await fetchWeatherAndQuote();
+            updateLoadingProgress(90, 'Getting weather & quote...');
+
             startRealtimePolling();
             switchView('quick-look-view');
+
+            updateLoadingProgress(100, 'Done!');
+            setTimeout(() => {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => loadingScreen.classList.add('hidden'), 500);
+            }, 500);
         }
         
         authorizeButton.addEventListener('click', () => {
+             loadingScreen.classList.remove('hidden');
+             loadingScreen.style.opacity = '1';
              if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({prompt: 'consent'});
             } else {
@@ -600,8 +688,35 @@
             renderMonthlyView(true);
         }
 
-        // --- EXTERNAL APIS (Weather, Quotes) ---
+        // --- EXTERNAL APIS & DEBUG ---
+        function setupDebugControls() {
+            const debugTime = document.getElementById('debug-time');
+            const debugWeather = document.getElementById('debug-weather');
+            
+            debugTime.addEventListener('input', (e) => {
+                debugMode.time = parseInt(e.target.value);
+                updateTimeAndDate(); // Force immediate update
+            });
+
+            debugWeather.addEventListener('change', (e) => {
+                debugMode.weather = e.target.value || null;
+                fetchWeatherAndQuote(); // Re-run to apply override or fetch live
+            });
+        }
+
         async function fetchWeatherAndQuote() {
+             if (debugMode.weather) {
+                currentWeatherData = {
+                    temp: `69°F`, // Mock temp
+                    main: debugMode.weather,
+                    description: `Debug: ${debugMode.weather}`
+                };
+                updateWeatherUI();
+                updateWeatherEffects(activeViewId === 'night-view');
+                fetchAIQuote();
+                return;
+             }
+
              if (!navigator.geolocation) return;
              navigator.geolocation.getCurrentPosition(async (position) => {
                 const { latitude, longitude } = position.coords;
@@ -636,17 +751,13 @@
             const oldEffects = weatherBg.querySelectorAll('.raindrop, .star, .cloud');
             oldEffects.forEach(el => el.remove());
             
-            // Cloud generation logic
             let cloudCount = 0;
             let cloudColor = 'rgba(255, 255, 255, 0.15)';
             if (isNight) cloudColor = 'rgba(51, 65, 85, 0.2)';
 
             switch (weatherType) {
-                case 'clouds':
-                    cloudCount = 7;
-                    break;
-                case 'rain':
-                case 'drizzle':
+                case 'clouds': cloudCount = 7; break;
+                case 'rain': case 'drizzle':
                     cloudCount = 12;
                     cloudColor = isNight ? 'rgba(30, 41, 59, 0.4)' : 'rgba(100, 116, 139, 0.3)';
                     break;
@@ -654,9 +765,7 @@
                     cloudCount = 15;
                     cloudColor = isNight ? 'rgba(15, 23, 42, 0.6)' : 'rgba(51, 65, 85, 0.5)';
                     break;
-                case 'clear':
-                    cloudCount = 2;
-                    break;
+                case 'clear': cloudCount = 2; break;
             }
             for (let i = 0; i < cloudCount; i++) {
                 addEffect('cloud', { color: cloudColor, weather: weatherType });
@@ -709,7 +818,7 @@
                         'Authorization': `Bearer ${OPENAI_API_KEY}`
                     },
                     body: JSON.stringify({
-                        model: "gpt-3.5-turbo",
+                        model: "gpt-5-mini-2025-08-07",
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.7,
                         max_tokens: 40,
