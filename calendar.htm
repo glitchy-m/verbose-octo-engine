@@ -114,6 +114,15 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: #f59e0b; }
+            50% { border-color: #fcd34d; }
+        }
+
+        .new-event-alert {
+            animation: pulse-border 2s infinite;
+        }
         
         /* --- Calendar Grid --- */
         .calendar-grid {
@@ -233,6 +242,15 @@
             <p class="mt-12 text-2xl text-gray-400">Good night!</p>
         </div>
 
+        <!-- New Event View -->
+        <div id="new-event-view" class="view flex-col justify-center items-center h-full w-full text-center">
+            <div class="p-8 rounded-lg border-4 border-amber-400 bg-gray-900/70 backdrop-blur-xl max-w-3xl new-event-alert">
+                <h2 class="text-3xl font-bold text-amber-300 mb-4">🚨 NEW EVENT ADDED 🚨</h2>
+                <p id="new-event-title" class="text-6xl font-bold mb-2"></p>
+                <p id="new-event-time" class="text-4xl text-gray-300"></p>
+                <p class="text-lg text-gray-400 mt-6">Returning to normal view shortly...</p>
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -245,7 +263,9 @@
         // --- STATE ---
         let gapiInited = false;
         let activeViewId = 'quick-look-view';
+        let previousViewId = 'quick-look-view';
         let viewInterval;
+        let realtimePollingInterval;
         let tokenClient;
         let currentWeatherData = {};
         let currentEvents = [];
@@ -268,7 +288,6 @@
             setInterval(fetchWeatherAndQuote, 15 * 60 * 1000); // every 15 mins
             gapi.load('client', initializeGapiClient);
             
-            // Event Listeners for controls
             calendarSelector.addEventListener('change', refreshAllData);
             monthSelector.addEventListener('change', refreshAllData);
             viewSelector.addEventListener('change', (e) => switchView(e.target.value, true));
@@ -286,17 +305,11 @@
             const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'long' });
 
             if (isNight) {
-                if (activeViewId !== 'night-view') {
-                    switchView('night-view');
-                    updateWeatherEffects(true);
-                }
+                if (activeViewId !== 'night-view') switchView('night-view');
                 document.getElementById('night-time').textContent = timeString;
                 document.getElementById('night-date').textContent = dateString;
             } else {
-                if (activeViewId === 'night-view') {
-                    switchView(viewSelector.value); // Return to selected view
-                    updateWeatherEffects(false);
-                }
+                if (activeViewId === 'night-view') switchView(viewSelector.value);
                 document.getElementById('quick-time').textContent = timeString;
                 document.getElementById('quick-date').textContent = dateString;
             }
@@ -304,18 +317,20 @@
         
         // --- VIEW MANAGEMENT ---
         function switchView(viewId, manualSwitch = false) {
-            clearInterval(viewInterval); // Clear any existing timer
+            clearInterval(viewInterval);
+            if (activeViewId !== 'night-view' && activeViewId !== 'new-event-view') {
+                previousViewId = activeViewId;
+            }
 
-            // Only start the auto-cycle timer for specific views
             if (['quick-look-view', 'monthly-view'].includes(viewId)) {
                 viewInterval = setInterval(() => {
                     const cyclingViews = ['quick-look-view', 'monthly-view'];
-                    const nextIndex = (cyclingViews.indexOf(activeViewId) + 1) % cyclingViews.length;
+                    const currentIndex = cyclingViews.indexOf(activeViewId);
+                    const nextIndex = (currentIndex + 1) % cyclingViews.length;
                     switchView(cyclingViews[nextIndex]);
                 }, 30000);
             }
 
-            // Show month selector only for calendar views
             if (['monthly-view', 'dense-view'].includes(viewId)) {
                 monthSelector.classList.remove('hidden');
             } else {
@@ -324,9 +339,8 @@
 
             activeViewId = viewId;
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
+            document.getElementById(viewId)?.classList.add('active');
 
-            // If the user manually selected a view, update the dropdown
             if(manualSwitch){
                 viewSelector.value = viewId;
             }
@@ -344,7 +358,7 @@
             });
         }
         
-        // --- GOOGLE CALENDAR API ---
+        // --- GOOGLE CALENDAR API & AUTH ---
         async function initializeGapiClient() {
             try {
                 await gapi.client.init({
@@ -355,25 +369,49 @@
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: GOOGLE_CLIENT_ID,
                     scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly',
-                    callback: '',
+                    callback: handleTokenResponse,
                 });
-                authorizeButton.disabled = false;
-                authorizeButton.textContent = 'Connect Google Calendar';
-            } catch (err) {
-                console.error("GAPI/Token Client Error:", err);
-            }
+                
+                // Check for saved token
+                const storedToken = localStorage.getItem('googleOauthToken');
+                if (storedToken) {
+                    const token = JSON.parse(storedToken);
+                    // Check if token is expired
+                    if (token.expires_at > Date.now()) {
+                        gapi.client.setToken(token);
+                        handleSuccessfulLogin();
+                    } else {
+                        localStorage.removeItem('googleOauthToken');
+                        authorizeButton.disabled = false;
+                        authorizeButton.textContent = 'Connect Google Calendar';
+                    }
+                } else {
+                    authorizeButton.disabled = false;
+                    authorizeButton.textContent = 'Connect Google Calendar';
+                }
+
+            } catch (err) { console.error("GAPI/Token Client Error:", err); }
+        }
+        
+        function handleTokenResponse(resp) {
+            if (resp.error) throw resp;
+            const token = gapi.client.getToken();
+            token.expires_at = Date.now() + (parseInt(token.expires_in, 10) * 1000);
+            localStorage.setItem('googleOauthToken', JSON.stringify(token));
+            handleSuccessfulLogin();
+        }
+
+        async function handleSuccessfulLogin() {
+            authScreen.style.display = 'none';
+            headerControls.classList.remove('hidden');
+            await loadCalendarList();
+            await refreshAllData();
+            startRealtimePolling();
+            switchView('quick-look-view');
         }
         
         authorizeButton.addEventListener('click', () => {
-             tokenClient.callback = async (resp) => {
-                if (resp.error) throw resp;
-                authScreen.style.display = 'none';
-                headerControls.classList.remove('hidden');
-                await loadCalendarList();
-                await refreshAllData();
-                switchView('quick-look-view');
-            };
-            if (gapi.client.getToken() === null) {
+             if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({prompt: 'consent'});
             } else {
                 tokenClient.requestAccessToken({prompt: ''});
@@ -398,8 +436,9 @@
             });
         }
 
-        async function fetchEventsForMonth() {
+        async function fetchEventsForMonth(isPoll = false) {
             const calendarId = calendarSelector.value;
+            if (!calendarId) return [];
             const selectedMonth = parseInt(monthSelector.value);
             const year = new Date().getFullYear();
             const timeMin = new Date(year, selectedMonth, 1).toISOString();
@@ -411,13 +450,59 @@
                     'timeMin': timeMin, 'timeMax': timeMax,
                     'showDeleted': false, 'singleEvents': true, 'orderBy': 'startTime'
                 });
-                currentEvents = response.result.items;
+                const fetchedEvents = response.result.items;
+                if(isPoll) return fetchedEvents;
+                currentEvents = fetchedEvents;
             } catch(err) {
                  console.error('Error fetching events:', err);
+                 if(isPoll) return [];
                  currentEvents = [];
             }
         }
+
+        // --- REAL-TIME & NEW EVENT LOGIC ---
+        function startRealtimePolling() {
+            if (realtimePollingInterval) clearInterval(realtimePollingInterval);
+            realtimePollingInterval = setInterval(checkForUpdates, 60 * 1000); // Poll every minute
+        }
+
+        async function checkForUpdates() {
+            const newEventsList = await fetchEventsForMonth(true);
+            const oldEventIds = new Set(currentEvents.map(e => e.id));
+            const newEvent = newEventsList.find(e => !oldEventIds.has(e.id));
+            
+            // Also check for event count changes for deleted/updated events
+            const needsUpdate = newEventsList.length !== currentEvents.length || newEvent;
+
+            if (needsUpdate) {
+                currentEvents = newEventsList;
+                renderAllViews(); // Refresh views in the background
+                
+                if (newEvent) {
+                    showNewEventScreen(newEvent);
+                }
+            }
+        }
+
+        function showNewEventScreen(event) {
+            const titleEl = document.getElementById('new-event-title');
+            const timeEl = document.getElementById('new-event-time');
+            const startDate = new Date(event.start.dateTime || event.start.date);
+            
+            titleEl.textContent = event.summary;
+            timeEl.textContent = startDate.toLocaleString([], { dateStyle: 'full', timeStyle: 'short' });
+
+            switchView('new-event-view');
+
+            setTimeout(() => {
+                // Only switch back if we are still on the new event screen
+                if (activeViewId === 'new-event-view') {
+                    switchView(previousViewId || 'quick-look-view');
+                }
+            }, 10 * 60 * 1000); // 10 minutes
+        }
         
+        // --- RENDERING VIEWS ---
         function renderAllViews() {
             renderQuickLook();
             renderMonthlyView();
@@ -457,7 +542,6 @@
             });
         }
 
-        // Helper function to get contrasting text color (white or black) for a given hex background color
         function getContrastColor(hex) {
             if (!hex) return '#FFFFFF';
             const r = parseInt(hex.substr(1, 2), 16);
@@ -554,11 +638,9 @@
             const weatherType = (currentWeatherData.main || 'clear').toLowerCase();
             weatherBg.className = `weather-bg weather-${weatherType}-${isNight ? 'night' : 'day'}`;
             
-            // Clear old effects
             const oldEffects = weatherBg.querySelectorAll('.raindrop, .star, .cloud');
             oldEffects.forEach(el => el.remove());
             
-            // Add new effects
             if (['rain', 'drizzle', 'thunderstorm'].includes(weatherType)) {
                 for(let i=0; i<50; i++) addEffect('raindrop');
             } else if (isNight) {
