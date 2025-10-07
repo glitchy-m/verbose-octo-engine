@@ -78,15 +78,14 @@
         .cloud {
             width: 200px;
             height: 60px;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--cloud-color);
             border-radius: 100px;
             animation-name: move-cloud;
-            animation-duration: 60s;
         }
         .cloud::before, .cloud::after {
             content: '';
             position: absolute;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--cloud-color);
             border-radius: 50%;
         }
         .cloud::before { width: 100px; height: 80px; top: -40px; left: 20px; }
@@ -372,11 +371,9 @@
                     callback: handleTokenResponse,
                 });
                 
-                // Check for saved token
                 const storedToken = localStorage.getItem('googleOauthToken');
                 if (storedToken) {
                     const token = JSON.parse(storedToken);
-                    // Check if token is expired
                     if (token.expires_at > Date.now()) {
                         gapi.client.setToken(token);
                         handleSuccessfulLogin();
@@ -463,7 +460,7 @@
         // --- REAL-TIME & NEW EVENT LOGIC ---
         function startRealtimePolling() {
             if (realtimePollingInterval) clearInterval(realtimePollingInterval);
-            realtimePollingInterval = setInterval(checkForUpdates, 60 * 1000); // Poll every minute
+            realtimePollingInterval = setInterval(checkForUpdates, 60 * 1000);
         }
 
         async function checkForUpdates() {
@@ -471,12 +468,11 @@
             const oldEventIds = new Set(currentEvents.map(e => e.id));
             const newEvent = newEventsList.find(e => !oldEventIds.has(e.id));
             
-            // Also check for event count changes for deleted/updated events
             const needsUpdate = newEventsList.length !== currentEvents.length || newEvent;
 
             if (needsUpdate) {
                 currentEvents = newEventsList;
-                renderAllViews(); // Refresh views in the background
+                renderAllViews();
                 
                 if (newEvent) {
                     showNewEventScreen(newEvent);
@@ -495,11 +491,10 @@
             switchView('new-event-view');
 
             setTimeout(() => {
-                // Only switch back if we are still on the new event screen
                 if (activeViewId === 'new-event-view') {
                     switchView(previousViewId || 'quick-look-view');
                 }
-            }, 10 * 60 * 1000); // 10 minutes
+            }, 10 * 60 * 1000);
         }
         
         // --- RENDERING VIEWS ---
@@ -620,7 +615,7 @@
                         description: data.weather[0].description
                     };
                     updateWeatherUI();
-                    updateWeatherEffects(document.getElementById('night-view').classList.contains('active'));
+                    updateWeatherEffects(activeViewId === 'night-view');
                     fetchAIQuote();
                 } catch(err) { console.error("Error fetching weather:", err); }
             });
@@ -641,29 +636,56 @@
             const oldEffects = weatherBg.querySelectorAll('.raindrop, .star, .cloud');
             oldEffects.forEach(el => el.remove());
             
+            // Cloud generation logic
+            let cloudCount = 0;
+            let cloudColor = 'rgba(255, 255, 255, 0.15)';
+            if (isNight) cloudColor = 'rgba(51, 65, 85, 0.2)';
+
+            switch (weatherType) {
+                case 'clouds':
+                    cloudCount = 7;
+                    break;
+                case 'rain':
+                case 'drizzle':
+                    cloudCount = 12;
+                    cloudColor = isNight ? 'rgba(30, 41, 59, 0.4)' : 'rgba(100, 116, 139, 0.3)';
+                    break;
+                case 'thunderstorm':
+                    cloudCount = 15;
+                    cloudColor = isNight ? 'rgba(15, 23, 42, 0.6)' : 'rgba(51, 65, 85, 0.5)';
+                    break;
+                case 'clear':
+                    cloudCount = 2;
+                    break;
+            }
+            for (let i = 0; i < cloudCount; i++) {
+                addEffect('cloud', { color: cloudColor, weather: weatherType });
+            }
+            
             if (['rain', 'drizzle', 'thunderstorm'].includes(weatherType)) {
                 for(let i=0; i<50; i++) addEffect('raindrop');
-            } else if (isNight) {
+            } else if (isNight && weatherType === 'clear') {
                 for(let i=0; i<100; i++) addEffect('star');
-            } else if (weatherType.includes('cloud')) {
-                for(let i=0; i<5; i++) addEffect('cloud');
             }
         }
 
-        function addEffect(type) {
+        function addEffect(type, options = {}) {
             const el = document.createElement('div');
             el.className = type;
             el.style.left = `${Math.random() * 100}vw`;
-            const duration = 2 + Math.random() * 3;
             const delay = Math.random() * 5;
-            el.style.animationDuration = `${duration}s`;
             el.style.animationDelay = `${delay}s`;
 
             if (type === 'cloud') {
-                 el.style.top = `${Math.random() * 30}vh`;
-                 el.style.animationDuration = `${40 + Math.random() * 40}s`;
+                el.style.setProperty('--cloud-color', options.color);
+                el.style.top = `${Math.random() * 40}vh`;
+                el.style.transform = `scale(${0.5 + Math.random() * 0.8})`;
+                el.style.opacity = (options.weather === 'clear' ? 0.3 : 0.4) + Math.random() * 0.5;
+                el.style.animationDuration = `${60 + Math.random() * 80}s`;
             } else if (type === 'raindrop') {
                  el.style.animationDuration = `${0.5 + Math.random() * 0.5}s`;
+            } else if (type === 'star') {
+                el.style.animationDuration = `${1.5 + Math.random() * 2}s`;
             }
             weatherBg.appendChild(el);
         }
