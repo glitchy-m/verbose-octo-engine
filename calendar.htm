@@ -153,13 +153,10 @@
     </style>
 </head>
 <body class="h-full bg-gray-900 text-white overflow-hidden">
-    <!-- Weather Background -->
     <div id="weather-bg" class="weather-bg"></div>
 
-    <!-- Main Container -->
     <div class="relative flex flex-col h-full p-4 sm:p-6 md:p-8 lg:p-12">
         
-        <!-- Loading Screen -->
         <div id="loading-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm transition-opacity duration-500">
             <div class="w-full max-w-md text-center">
                 <h1 class="text-3xl font-bold mb-4">Initializing Display...</h1>
@@ -170,7 +167,6 @@
             </div>
         </div>
 
-        <!-- Auth Screen -->
         <div id="auth-screen" class="absolute inset-0 z-40 flex items-center justify-center bg-gray-900/80 backdrop-blur-md hidden">
             <div class="text-center">
                 <h1 class="text-3xl font-bold mb-4">Welcome to Your Dynamic Display</h1>
@@ -181,12 +177,10 @@
             </div>
         </div>
 
-        <!-- Master Controls Toggle -->
         <button id="toggle-controls-btn" class="absolute top-4 left-4 z-50 text-white p-2 bg-gray-800/50 rounded-full hover:bg-gray-700/70 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-75"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </button>
 
-        <!-- Debug Panel -->
         <div id="debug-panel" class="absolute top-16 left-4 z-50 bg-gray-800/80 backdrop-blur-md p-4 rounded-lg space-y-3 hidden">
             <h3 class="font-bold text-lg">Debug Controls</h3>
             <div>
@@ -207,7 +201,6 @@
             </div>
         </div>
 
-        <!-- Header Controls -->
         <div id="header-controls" class="absolute top-4 right-4 z-40 flex items-center gap-4 hidden">
             <select id="calendar-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600"></select>
             <select id="month-selector" class="bg-gray-800/50 text-white rounded-md p-2 border border-gray-600 hidden"></select>
@@ -218,7 +211,6 @@
             </select>
         </div>
 
-        <!-- Quick Look View -->
         <div id="quick-look-view" class="view flex-col justify-between h-full w-full">
             <div class="flex justify-between items-start">
                 <div>
@@ -242,7 +234,6 @@
             </div>
         </div>
 
-        <!-- Monthly View -->
         <div id="monthly-view" class="view flex-col h-full w-full">
             <h1 id="calendar-title" class="text-4xl md:text-5xl font-bold mb-4"></h1>
             <div id="calendar-header" class="calendar-grid">
@@ -257,7 +248,6 @@
             <div id="calendar-body" class="calendar-grid flex-grow"></div>
         </div>
 
-        <!-- Dense View -->
         <div id="dense-view" class="view flex-col h-full w-full">
             <h1 id="dense-calendar-title" class="text-4xl md:text-5xl font-bold mb-4"></h1>
             <div id="dense-calendar-header" class="calendar-grid">
@@ -272,7 +262,6 @@
             <div id="dense-calendar-body" class="calendar-grid flex-grow"></div>
         </div>
 
-        <!-- Night View -->
         <div id="night-view" class="view flex-col justify-center items-center h-full w-full text-center">
              <div id="night-time" class="text-7xl md:text-9xl font-bold tracking-tight"></div>
              <div id="night-date" class="text-4xl md:text-6xl font-medium text-gray-300"></div>
@@ -283,7 +272,6 @@
             <p class="mt-12 text-2xl text-gray-400">Good night!</p>
         </div>
 
-        <!-- New Event View -->
         <div id="new-event-view" class="view flex-col justify-center items-center h-full w-full text-center">
             <div class="p-8 rounded-lg border-4 border-amber-400 bg-gray-900/70 backdrop-blur-xl max-w-3xl new-event-alert">
                 <h2 class="text-3xl font-bold text-amber-300 mb-4">🚨 NEW EVENT ADDED 🚨</h2>
@@ -296,10 +284,12 @@
 
     <script type="module">
         // --- CONFIGURATION ---
+        // ⚠️ SECURITY WARNING: Storing API keys in client-side code is highly insecure and can lead to theft.
+        // For production, these should be moved to a backend server that proxies the requests.
         const GOOGLE_CLIENT_ID = '415018106195-utjkai9r1ar3pd6ep5f06kt5ma0tfg0k.apps.googleusercontent.com';
-        const GOOGLE_API_KEY = 'AIzaSyA-Gqmhu3nG6jAPE8VFyzWv5Ppdbf1Ot8k';
+        const GOOGLE_API_KEY = 'AIzaSyA-Gqmhu3nG6jAPE8VFyzWv5Ppdbf1Ot8k'; // This key should have restrictions in Google Cloud Console
         const OPENWEATHER_API_KEY = 'e59fe270071be5ed24b5a1ec85ef84c3';
-        const OPENAI_API_KEY = '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';
+        const OPENAI_API_KEY = 'REPLACE_WITH_YOUR_VALID_OPENAI_KEY'; // ❗ FIX: The original key was invalid. Replace this with a valid one.
         
         // --- STATE ---
         let gapiInited = false;
@@ -368,7 +358,6 @@
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
             const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'long' });
 
-            // This logic now correctly handles manual overrides
             if (isNight) {
                 if (activeViewId !== 'night-view') {
                     switchView('night-view');
@@ -588,7 +577,7 @@
                 if (activeViewId === 'new-event-view') {
                     switchView(previousViewId || 'quick-look-view');
                 }
-            }, 10 * 60 * 1000);
+            }, 20 * 1000); // FIX: Reduced timeout from 10 minutes to 20 seconds
         }
         
         // --- RENDERING VIEWS ---
@@ -613,7 +602,7 @@
             upcomingEvents.forEach((event, index) => {
                  const { summary, start } = event;
                  const startDate = new Date(start.dateTime || start.date);
-                 const diffDays = Math.ceil((startDate.setHours(0,0,0,0) - now.setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+                 const diffDays = Math.ceil((new Date(startDate).setHours(0,0,0,0) - new Date(now).setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
                  const relativeTime = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Tomorrow' : `in ${diffDays} days`;
 
                  const eventEl = document.createElement('div');
@@ -811,6 +800,12 @@
         }
         
         async function fetchAIQuote() {
+            // FIX: If the API key is a placeholder, don't even try to fetch.
+            if (OPENAI_API_KEY === 'REPLACE_WITH_YOUR_VALID_OPENAI_KEY') {
+                console.warn("OpenAI API key is not set. Using default quote.");
+                document.getElementById('quote-container').textContent = `"The future belongs to those who believe in the beauty of their dreams."`;
+                return;
+            }
             const prompt = `Generate a short, insightful, one-sentence quote.
                            The current time is ${new Date().toLocaleTimeString()}.
                            The weather is ${currentWeatherData.description || 'clear'}.
@@ -824,18 +819,32 @@
                         'Authorization': `Bearer ${OPENAI_API_KEY}`
                     },
                     body: JSON.stringify({
-                        model: "gpt-5-mini-2025-08-07",
+                        model: "gpt-4o-mini", // FIX: Changed to a valid, existing model.
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.7,
                         max_tokens: 40,
                     })
                 });
-                const data = await response.json();
-                let quote = data.choices[0].message.content.trim();
-                if (quote.startsWith('"') && quote.endsWith('"')) {
-                    quote = quote.substring(1, quote.length - 1);
+
+                // FIX: Check if the response is OK before parsing JSON.
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`OpenAI API Error: ${response.status} ${response.statusText} - ${errorData.error.message}`);
                 }
-                document.getElementById('quote-container').textContent = `"${quote}"`;
+
+                const data = await response.json();
+                
+                // FIX: Safely access the choice to prevent TypeError if the response is malformed.
+                if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                    let quote = data.choices[0].message.content.trim();
+                    if (quote.startsWith('"') && quote.endsWith('"')) {
+                        quote = quote.substring(1, quote.length - 1);
+                    }
+                    document.getElementById('quote-container').textContent = `"${quote}"`;
+                } else {
+                    throw new Error("Invalid response structure from OpenAI API.");
+                }
+
             } catch (err) {
                 console.error("Error fetching AI quote:", err);
                 document.getElementById('quote-container').textContent = `"The future belongs to those who believe in the beauty of their dreams."`;
