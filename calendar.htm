@@ -60,11 +60,11 @@
         @keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 1; } }
         .star { width: 2px; height: 2px; background-color: white; border-radius: 50%; animation-name: twinkle; }
         @keyframes twinkle { 0%, 100% { opacity: 0; } 50% { opacity: 0.8; } }
-        .cloud { width: 200px; height: 60px; background: var(--cloud-color); border-radius: 100px; animation-name: move-cloud; }
+        .cloud { width: 200px; height: 60px; background: var(--cloud-color); border-radius: 100px; animation-name: move-cloud; will-change: transform, opacity; }
         .cloud::before, .cloud::after { content: ''; position: absolute; background: var(--cloud-color); border-radius: 50%; }
         .cloud::before { width: 100px; height: 80px; top: -40px; left: 20px; }
         .cloud::after { width: 120px; height: 60px; top: -30px; right: 30px; }
-        @keyframes move-cloud { 0% { transform: translateX(-250px); } 100% { transform: translateX(110vw); } }
+        @keyframes move-cloud { 0% { transform: translateX(-250px) translateZ(0); } 100% { transform: translateX(110vw) translateZ(0); } }
 
         /* General UI */
         .view { display: none; animation: fadeIn 0.8s ease-in-out; opacity: 0; will-change: opacity; }
@@ -1010,3 +1010,4 @@
     </script>
 </body>
 </html>
+
