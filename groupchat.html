@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Group Chat</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Font: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -33,46 +31,56 @@
 </head>
 <body class="bg-gray-900 text-white h-screen flex flex-col">
 
-    <!-- ===== Username Modal ===== -->
     <div id="username-modal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 transition-opacity duration-300">
-        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
             <h2 class="text-2xl font-bold text-center mb-6">Join Chat</h2>
             <div class="space-y-4">
-                <label for="username-input" class="block text-sm font-medium text-gray-400">Choose a nickname</label>
-                <input type="text" id="username-input" placeholder="Your name..." class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                <button id="join-chat-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out">
-                    Join
-                </button>
+                <div>
+                    <label for="username-input" class="block text-sm font-medium text-gray-400">Nickname (for display)</label>
+                    <input type="text" id="username-input" placeholder="Your display name..." class="mt-1 w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                 <div>
+                    <label for="email-input" class="block text-sm font-medium text-gray-400">Email</label>
+                    <input type="email" id="email-input" placeholder="you@example.com" class="mt-1 w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                 <div>
+                    <label for="password-input" class="block text-sm font-medium text-gray-400">Password</label>
+                    <input type="password" id="password-input" placeholder="••••••••" class="mt-1 w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                
+                <div class="flex space-x-4">
+                    <button id="login-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out">
+                        Login
+                    </button>
+                    <button id="signup-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out">
+                        Sign Up
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ===== Chat Container ===== -->
     <div id="chat-container" class="hidden flex flex-col h-full">
-        <!-- Header -->
-        <header class="bg-gray-800 p-4 shadow-md z-10">
-            <h1 class="text-xl font-bold text-center">Group Chat</h1>
+        <header class="bg-gray-800 p-4 shadow-md z-10 flex justify-between items-center">
+            <h1 class="text-xl font-bold">Group Chat</h1>
+            <button id="logout-btn" class="text-sm bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-150">
+                Logout
+            </button>
         </header>
 
-        <!-- Messages Area -->
         <main id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4">
-            <!-- Messages will be injected here by JavaScript -->
-        </main>
+            </main>
 
-        <!-- Input Area -->
         <footer class="bg-gray-800 p-4 shadow-inner">
             <form id="message-form" class="flex items-center space-x-2">
-                <!-- Attachment Buttons -->
                 <button type="button" id="giphy-btn" title="Send GIF" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition duration-150">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                 </button>
 
-                <!-- Text Input -->
                 <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" class="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
-                <!-- Send Button -->
                 <button type="submit" id="send-btn" class="p-2 bg-blue-600 hover:bg-blue-700 rounded-full text-white transition duration-150">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -82,7 +90,6 @@
         </footer>
     </div>
 
-    <!-- ===== GIPHY Modal ===== -->
     <div id="giphy-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center z-40 p-4">
         <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -94,12 +101,10 @@
                 <button id="giphy-search-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Search</button>
             </div>
             <div id="giphy-results" class="grid grid-cols-2 md:grid-cols-4 gap-2 overflow-y-auto h-64">
-                <!-- GIF results will be injected here -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- ===== Custom Error Modal ===== -->
     <div id="error-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm text-center">
             <h3 class="text-xl font-bold text-red-500 mb-4">Error</h3>
@@ -111,15 +116,16 @@
     </div>
 
 
-    <!-- Firebase SDK -->
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
-            signInAnonymously, 
-            signInWithCustomToken, 
-            onAuthStateChanged 
+            onAuthStateChanged,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            updateProfile,
+            signOut
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
@@ -130,28 +136,28 @@
             serverTimestamp,
             setLogLevel
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // Removed all firebase-storage imports
 
         // === GIPHY KEY ===
-        // Get your free key from https://developers.giphy.com/
         const GIPHY_API_KEY = "URYJQXPmbSnvlUaMbPfaLCjMBkmT57Ce"; 
 
         // === Firebase & App State ===
-        let app, db, auth; // Removed 'storage'
+        let app, db, auth;
         let userId, username;
         let messagesCollectionRef;
-        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB (Kept for reference, but not used)
 
         // === DOM Elements ===
         const usernameModal = document.getElementById("username-modal");
         const usernameInput = document.getElementById("username-input");
-        const joinChatBtn = document.getElementById("join-chat-btn");
+        const emailInput = document.getElementById("email-input");
+        const passwordInput = document.getElementById("password-input");
+        const loginBtn = document.getElementById("login-btn");
+        const signupBtn = document.getElementById("signup-btn");
+        const logoutBtn = document.getElementById("logout-btn");
+
         const chatContainer = document.getElementById("chat-container");
         const messagesContainer = document.getElementById("messages-container");
         const messageForm = document.getElementById("message-form");
         const messageInput = document.getElementById("message-input");
-        
-        // Removed image/file upload buttons and inputs
         
         const giphyBtn = document.getElementById("giphy-btn");
         const giphyModal = document.getElementById("giphy-modal");
@@ -160,7 +166,6 @@
         const giphySearchBtn = document.getElementById("giphy-search-btn");
         const giphyResults = document.getElementById("giphy-results");
 
-        // Removed loadingOverlay
         const errorModal = document.getElementById("error-modal");
         const errorMessage = document.getElementById("error-message");
         const errorCloseBtn = document.getElementById("error-close-btn");
@@ -177,7 +182,7 @@
         });
 
         // === Firebase Initialization & Auth ===
-        async function initializeAndSignIn() {
+        async function initializeFirebase() {
             try {
                 // Manually paste your Firebase config here
                 const firebaseConfig = {
@@ -198,51 +203,123 @@
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                // storage = getStorage(app); // Removed
                 setLogLevel('debug');
 
-                // Sign in
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    // This part will still work if you run it back in the original environment
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    // This will be used when running locally
-                    await signInAnonymously(auth);
-                }
+                // Main auth state listener
+                onAuthStateChanged(auth, handleAuthState);
 
-                userId = auth.currentUser.uid;
-                
-                // Setup Firestore collection reference
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const messagesPath = `artifacts/${appId}/public/data/chat-messages`;
-                messagesCollectionRef = collection(db, messagesPath);
-
-                // Start chat
-                usernameModal.classList.add("opacity-0", "pointer-events-none");
-                chatContainer.classList.remove("hidden");
-                loadMessages();
-
-            } catch (error)
- {
-                showError(`Failed to initialize chat: ${error.message}`);
+            } catch (error) {
+                showError(`Failed to initialize Firebase: ${error.message}`);
             }
         }
 
-        joinChatBtn.addEventListener("click", () => {
-            const name = usernameInput.value.trim();
-            if (name) {
-                username = name;
-                initializeAndSignIn();
+        async function handleAuthState(user) {
+            if (user) {
+                // User is signed in
+                userId = user.uid;
+                username = user.displayName;
+
+                // If user has no display name (e.g., first login, or failed update)
+                // try to get it from the input box.
+                if (!username) {
+                    const nameFromInput = usernameInput.value.trim();
+                    if (nameFromInput) {
+                        try {
+                            await updateProfile(user, { displayName: nameFromInput });
+                            username = nameFromInput; // Set it for the current session
+                            startChat();
+                        } catch (error) {
+                            showError(`Failed to update profile: ${error.message}`);
+                            await signOut(auth); // Log out on profile error
+                        }
+                    } else {
+                        // Logged in, no name, and no name in input.
+                        // This can happen on a page refresh. We log them out
+                        // to force them to re-enter credentials *with* a nickname.
+                        showError("Welcome! Please provide a nickname along with your credentials to continue.");
+                        await signOut(auth); 
+                    }
+                } else {
+                    // User is logged in AND has a display name
+                    startChat();
+                }
             } else {
-                showError("Please enter a nickname to join the chat.");
+                // User is signed out
+                usernameModal.classList.remove("hidden", "opacity-0", "pointer-events-none");
+                chatContainer.classList.add("hidden");
+                userId = null;
+                username = null;
+                // Clear inputs for fresh login
+                usernameInput.value = "";
+                emailInput.value = "";
+                passwordInput.value = "";
+            }
+        }
+
+        function startChat() {
+            // Setup Firestore collection reference
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const messagesPath = `artifacts/${appId}/public/data/chat-messages`;
+            messagesCollectionRef = collection(db, messagesPath);
+
+            // Hide modal, show chat
+            usernameModal.classList.add("hidden", "opacity-0", "pointer-events-none");
+            chatContainer.classList.remove("hidden");
+            loadMessages();
+        }
+        
+        // === Auth Event Listeners ===
+        signupBtn.addEventListener("click", async () => {
+            const name = usernameInput.value.trim();
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            if (!name || !email || !password) {
+                showError("Please fill in nickname, email, and password to sign up.");
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                // Now update the profile. onAuthStateChanged will handle the rest.
+                await updateProfile(userCredential.user, { displayName: name });
+            } catch (error) {
+                showError(`Sign up failed: ${error.message}`);
             }
         });
 
+        loginBtn.addEventListener("click", async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            if (!email || !password) {
+                showError("Please enter email and password to log in.");
+                return;
+            }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle the rest, including the nickname check.
+            } catch (error) {
+                showError(`Login failed: ${error.message}`);
+            }
+        });
+
+        logoutBtn.addEventListener("click", () => {
+            signOut(auth).catch(error => showError(`Logout failed: ${error.message}`));
+        });
+
+
         // === Load & Render Messages ===
         function loadMessages() {
+            // Prevent duplicate listeners if startChat is called multiple times
+            if (window.messagesUnsubscribe) {
+                window.messagesUnsubscribe();
+            }
+
             const q = query(messagesCollectionRef);
             
-            onSnapshot(q, (snapshot) => {
+            window.messagesUnsubscribe = onSnapshot(q, (snapshot) => {
                 let messages = [];
                 snapshot.forEach(doc => {
                     messages.push({ id: doc.id, ...doc.data() });
@@ -265,7 +342,7 @@
         }
 
         function appendMessage(messageData) {
-            const { text, username: msgUser, uid, createdAt, imageUrl, fileUrl, fileName } = messageData;
+            const { text, username: msgUser, uid, createdAt, imageUrl } = messageData;
             
             if (!uid) return; // Skip messages without a UID
 
@@ -291,8 +368,6 @@
                 `;
             }
 
-            // File content section (Removed)
-
             messageElement.innerHTML = `
                 <div class_name="message-bubble ${isSent ? 'bg-blue-600 ml-auto rounded-l-lg rounded-t-lg' : 'bg-gray-700 mr-auto rounded-r-lg rounded-t-lg'} max-w-xs md:max-w-md p-3 shadow-md">
                     <div class="font-bold text-sm ${isSent ? 'text-white' : 'text-blue-300'}">${escapeHTML(msgUser)}</div>
@@ -311,6 +386,11 @@
             
             const text = messageInput.value.trim();
             if (text === '') return;
+            
+            if (!userId || !username) {
+                showError("You are not signed in. Please refresh and log in.");
+                return;
+            }
 
             try {
                 await addDoc(messagesCollectionRef, {
@@ -326,9 +406,6 @@
         }
         messageForm.addEventListener("submit", sendMessage);
 
-        // === File & Image Uploading (Removed) ===
-        // All related functions and event listeners have been deleted.
-
         // === GIPHY Logic ===
         giphyBtn.addEventListener("click", () => giphyModal.classList.remove("hidden"));
         giphyCloseBtn.addEventListener("click", () => giphyModal.classList.add("hidden"));
@@ -341,7 +418,7 @@
             const searchTerm = giphySearchInput.value.trim();
             if (!searchTerm) return;
             
-            if (GIPHY_API_KEY === "YOUR_GIPHY_API_KEY_HERE") {
+            if (GIPHY_API_KEY === "YOUR_GIPHY_API_KEY_HERE" || !GIPHY_API_KEY) {
                 showError("GIPHY API Key is not set. Please add it to the script.");
                 return;
             }
@@ -368,6 +445,11 @@
         }
 
         async function sendGiphy(imageUrl) {
+            if (!userId || !username) {
+                showError("You are not signed in. Please refresh and log in.");
+                return;
+            }
+
             try {
                 await addDoc(messagesCollectionRef, {
                     imageUrl: imageUrl, // This just saves the URL string
@@ -385,6 +467,7 @@
 
         // === Utility ===
         function escapeHTML(str) {
+            if (!str) return '';
             return str.replace(/[&<>"']/g, function(m) {
                 return {
                     '&': '&amp;',
@@ -396,7 +479,9 @@
             });
         }
 
+        // === Initialize App ===
+        initializeFirebase();
+
     </script>
 </body>
 </html>
-
