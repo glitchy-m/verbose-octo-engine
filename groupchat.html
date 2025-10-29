@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Chat</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use Inter as the default font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for message container */
+        #messages-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #messages-container::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        #messages-container::-webkit-scrollbar-thumb {
+            background: #4b5563; /* gray-600 */
+            border-radius: 4px;
+        }
+        #messages-container::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* gray-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col">
+
+    <!-- ===== Username Modal ===== -->
+    <div id="username-modal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-center mb-6">Join Chat</h2>
+            <div class="space-y-4">
+                <label for="username-input" class="block text-sm font-medium text-gray-400">Choose a nickname</label>
+                <input type="text" id="username-input" placeholder="Your name..." class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                <button id="join-chat-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out">
+                    Join
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Chat Container ===== -->
+    <div id="chat-container" class="hidden flex flex-col h-full">
+        <!-- Header -->
+        <header class="bg-gray-800 p-4 shadow-md z-10">
+            <h1 class="text-xl font-bold text-center">Group Chat</h1>
+        </header>
+
+        <!-- Messages Area -->
+        <main id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- Messages will be injected here by JavaScript -->
+        </main>
+
+        <!-- Input Area -->
+        <footer class="bg-gray-800 p-4 shadow-inner">
+            <form id="message-form" class="flex items-center space-x-2">
+                <!-- Attachment Buttons -->
+                <button type="button" id="giphy-btn" title="Send GIF" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition duration-150">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                </button>
+
+                <!-- Text Input -->
+                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" class="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                
+                <!-- Send Button -->
+                <button type="submit" id="send-btn" class="p-2 bg-blue-600 hover:bg-blue-700 rounded-full text-white transition duration-150">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <!-- ===== GIPHY Modal ===== -->
+    <div id="giphy-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center z-40 p-4">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-2xl flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Search GIPHY</h3>
+                <button id="giphy-close-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="flex space-x-2 mb-4">
+                <input type="text" id="giphy-search-input" placeholder="Search for GIFs..." class="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="giphy-search-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Search</button>
+            </div>
+            <div id="giphy-results" class="grid grid-cols-2 md:grid-cols-4 gap-2 overflow-y-auto h-64">
+                <!-- GIF results will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Custom Error Modal ===== -->
+    <div id="error-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm text-center">
+            <h3 class="text-xl font-bold text-red-500 mb-4">Error</h3>
+            <p id="error-message" class="text-gray-300 mb-6">Something went wrong.</p>
+            <button id="error-close-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md">
+                Close
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            query, 
+            serverTimestamp,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Removed all firebase-storage imports
+
+        // === GIPHY KEY ===
+        // Get your free key from https://developers.giphy.com/
+        const GIPHY_API_KEY = "URYJQXPmbSnvlUaMbPfaLCjMBkmT57Ce"; 
+
+        // === Firebase & App State ===
+        let app, db, auth; // Removed 'storage'
+        let userId, username;
+        let messagesCollectionRef;
+        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB (Kept for reference, but not used)
+
+        // === DOM Elements ===
+        const usernameModal = document.getElementById("username-modal");
+        const usernameInput = document.getElementById("username-input");
+        const joinChatBtn = document.getElementById("join-chat-btn");
+        const chatContainer = document.getElementById("chat-container");
+        const messagesContainer = document.getElementById("messages-container");
+        const messageForm = document.getElementById("message-form");
+        const messageInput = document.getElementById("message-input");
+        
+        // Removed image/file upload buttons and inputs
+        
+        const giphyBtn = document.getElementById("giphy-btn");
+        const giphyModal = document.getElementById("giphy-modal");
+        const giphyCloseBtn = document.getElementById("giphy-close-btn");
+        const giphySearchInput = document.getElementById("giphy-search-input");
+        const giphySearchBtn = document.getElementById("giphy-search-btn");
+        const giphyResults = document.getElementById("giphy-results");
+
+        // Removed loadingOverlay
+        const errorModal = document.getElementById("error-modal");
+        const errorMessage = document.getElementById("error-message");
+        const errorCloseBtn = document.getElementById("error-close-btn");
+
+        // === Error Handling ===
+        function showError(message) {
+            console.error(message);
+            errorMessage.textContent = message;
+            errorModal.classList.remove("hidden");
+        }
+        
+        errorCloseBtn.addEventListener("click", () => {
+            errorModal.classList.add("hidden");
+        });
+
+        // === Firebase Initialization & Auth ===
+        async function initializeAndSignIn() {
+            try {
+                // Manually paste your Firebase config here
+                const firebaseConfig = {
+                  apiKey: "AIzaSyCXY4VCfkSFiv6aL45pHS2mEL934v5zF0U",
+                  authDomain: "chat-80655.firebaseapp.com",
+                  databaseURL: "https://chat-80655-default-rtdb.firebaseio.com",
+                  projectId: "chat-80655",
+                  storageBucket: "chat-80655.firebasestorage.app",
+                  messagingSenderId: "37387374764",
+                  appId: "1:37387374764:web:8eeaf2d0eb8529bec74f09"
+                };
+                
+                if (!firebaseConfig.apiKey) {
+                    showError("Firebase configuration is missing.");
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                // storage = getStorage(app); // Removed
+                setLogLevel('debug');
+
+                // Sign in
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    // This part will still work if you run it back in the original environment
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    // This will be used when running locally
+                    await signInAnonymously(auth);
+                }
+
+                userId = auth.currentUser.uid;
+                
+                // Setup Firestore collection reference
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const messagesPath = `artifacts/${appId}/public/data/chat-messages`;
+                messagesCollectionRef = collection(db, messagesPath);
+
+                // Start chat
+                usernameModal.classList.add("opacity-0", "pointer-events-none");
+                chatContainer.classList.remove("hidden");
+                loadMessages();
+
+            } catch (error)
+ {
+                showError(`Failed to initialize chat: ${error.message}`);
+            }
+        }
+
+        joinChatBtn.addEventListener("click", () => {
+            const name = usernameInput.value.trim();
+            if (name) {
+                username = name;
+                initializeAndSignIn();
+            } else {
+                showError("Please enter a nickname to join the chat.");
+            }
+        });
+
+        // === Load & Render Messages ===
+        function loadMessages() {
+            const q = query(messagesCollectionRef);
+            
+            onSnapshot(q, (snapshot) => {
+                let messages = [];
+                snapshot.forEach(doc => {
+                    messages.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort messages by timestamp (client-side to avoid index requirement)
+                messages.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+
+                renderMessages(messages);
+            }, (error) => {
+                showError(`Error loading messages: ${error.message}`);
+            });
+        }
+
+        function renderMessages(messages) {
+            messagesContainer.innerHTML = ''; // Clear existing messages
+            messages.forEach(appendMessage);
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function appendMessage(messageData) {
+            const { text, username: msgUser, uid, createdAt, imageUrl, fileUrl, fileName } = messageData;
+            
+            if (!uid) return; // Skip messages without a UID
+
+            const isSent = uid === userId;
+            const timestamp = createdAt?.seconds ? new Date(createdAt.seconds * 1000).toLocaleTimeString() : 'sending...';
+
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('flex', 'flex-col', isSent ? 'items-end' : 'items-start');
+
+            let contentHTML = '';
+
+            // Text content
+            if (text) {
+                contentHTML += `<p class="break-words">${escapeHTML(text)}</p>`;
+            }
+
+            // Image content (for GIPHY)
+            if (imageUrl) {
+                contentHTML += `
+                    <a href="${imageUrl}" target="_blank" rel="noopener noreferrer">
+                        <img src="${imageUrl}" alt="User upload" class="mt-2 rounded-lg max-w-full h-auto max-h-64 cursor-pointer" />
+                    </a>
+                `;
+            }
+
+            // File content section (Removed)
+
+            messageElement.innerHTML = `
+                <div class_name="message-bubble ${isSent ? 'bg-blue-600 ml-auto rounded-l-lg rounded-t-lg' : 'bg-gray-700 mr-auto rounded-r-lg rounded-t-lg'} max-w-xs md:max-w-md p-3 shadow-md">
+                    <div class="font-bold text-sm ${isSent ? 'text-white' : 'text-blue-300'}">${escapeHTML(msgUser)}</div>
+                    <div class="mt-1">
+                        ${contentHTML}
+                    </div>
+                    <div class="text-xs text-gray-400 mt-2 text-right">${timestamp}</div>
+                </div>
+            `;
+            messagesContainer.appendChild(messageElement);
+        }
+
+        // === Send Messages ===
+        async function sendMessage(event) {
+            if (event) event.preventDefault();
+            
+            const text = messageInput.value.trim();
+            if (text === '') return;
+
+            try {
+                await addDoc(messagesCollectionRef, {
+                    text: text,
+                    username: username,
+                    uid: userId,
+                    createdAt: serverTimestamp()
+                });
+                messageInput.value = '';
+            } catch (error) {
+                showError(`Failed to send message: ${error.message}`);
+            }
+        }
+        messageForm.addEventListener("submit", sendMessage);
+
+        // === File & Image Uploading (Removed) ===
+        // All related functions and event listeners have been deleted.
+
+        // === GIPHY Logic ===
+        giphyBtn.addEventListener("click", () => giphyModal.classList.remove("hidden"));
+        giphyCloseBtn.addEventListener("click", () => giphyModal.classList.add("hidden"));
+        giphySearchBtn.addEventListener("click", searchGiphy);
+        giphySearchInput.addEventListener("keydown", (e) => {
+            if (e.key === 'Enter') searchGiphy();
+        });
+
+        async function searchGiphy() {
+            const searchTerm = giphySearchInput.value.trim();
+            if (!searchTerm) return;
+            
+            if (GIPHY_API_KEY === "YOUR_GIPHY_API_KEY_HERE") {
+                showError("GIPHY API Key is not set. Please add it to the script.");
+                return;
+            }
+
+            const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(searchTerm)}&limit=12&rating=g`;
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`GIPHY API error: ${response.statusText}`);
+                const data = await response.json();
+                
+                giphyResults.innerHTML = '';
+                data.data.forEach(gif => {
+                    const img = document.createElement('img');
+                    img.src = gif.images.fixed_height_small.url;
+                    img.alt = gif.title;
+                    img.classList.add("w-full", "h-auto", "rounded", "cursor-pointer", "hover:opacity-80", "transition-opacity");
+                    img.onclick = () => sendGiphy(gif.images.original.url);
+                    giphyResults.appendChild(img);
+                });
+            } catch (error) {
+                showError(`Failed to search GIPHY: ${error.message}`);
+            }
+        }
+
+        async function sendGiphy(imageUrl) {
+            try {
+                await addDoc(messagesCollectionRef, {
+                    imageUrl: imageUrl, // This just saves the URL string
+                    username: username,
+                    uid: userId,
+                    createdAt: serverTimestamp()
+                });
+                giphyModal.classList.add("hidden");
+                giphySearchInput.value = '';
+                giphyResults.innerHTML = '';
+            } catch (error) {
+                showError(`Failed to send GIF: ${error.message}`);
+            }
+        }
+
+        // === Utility ===
+        function escapeHTML(str) {
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        }
+
+    </script>
+</body>
+</html>
+
