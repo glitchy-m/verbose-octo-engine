@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Remote Controller</title>
+<style>
+  body { font-family: sans-serif; background: #222; color: #eee; text-align: center; }
+  h1 { margin-top: 20px; }
+  #status { margin: 10px; font-weight: bold; }
+  .button { display: inline-block; width: 40px; height: 40px; margin: 5px; border-radius: 5px; line-height: 40px; text-align: center; background: #444; }
+  .pressed { background: #0f0; color: #000; font-weight: bold; }
+  #axes { margin-top: 20px; }
+</style>
+</head>
+<body>
+<h1>Remote Controller Monitor</h1>
+<div id="status">No controller connected</div>
+<div id="buttons"></div>
+<div id="axes"></div>
+
+<script>
+const ws = new WebSocket("wss://4ccb5eea0f57.ngrok-free.app"); // Replace with your wss URL
+ws.addEventListener('open', () => console.log("WebSocket open"));
+
+let gpIndex = null;
+let buttonElements = [];
+
+function updateDisplay(gp) {
+  // Show connection status
+  document.getElementById("status").textContent = "Controller connected: " + gp.id;
+
+  // Update buttons
+  const buttonsDiv = document.getElementById("buttons");
+  buttonsDiv.innerHTML = ""; // clear previous
+  gp.buttons.forEach((btn, i) => {
+    const el = document.createElement("div");
+    el.className = "button" + (btn.pressed ? " pressed" : "");
+    el.textContent = i;
+    buttonsDiv.appendChild(el);
+  });
+
+  // Update axes
+  const axesDiv = document.getElementById("axes");
+  axesDiv.innerHTML = "Axes: " + gp.axes.map(a => a.toFixed(2)).join(", ");
+}
+
+function poll() {
+  const gps = navigator.getGamepads();
+  const gp = gps[gpIndex ?? 0];
+  if (gp) {
+    updateDisplay(gp);
+
+    // Build payload to send
+    const payload = {
+      id: gp.id,
+      axes: gp.axes.slice(0, 4),
+      buttons: gp.buttons.map(b => b.pressed ? 1 : 0),
+      timestamp: gp.timestamp
+    };
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+  }
+  requestAnimationFrame(poll);
+}
+
+window.addEventListener("gamepadconnected", (e) => {
+  gpIndex = e.gamepad.index;
+  console.log("Gamepad connected:", e.gamepad);
+  requestAnimationFrame(poll);
+});
+
+window.addEventListe
