@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Realtime Word Cloud — 16 Days of Activism</title>
+<style>
+  :root{
+    --bg:#0f1724; /* deep midnight */
+    --accent:#7dd3fc; /* light cyan */
+    --muted:#94a3b8;
+    --card-bg: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:#fff;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+  #app{display:flex;flex-direction:column;height:100vh;gap:12px;padding:18px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .title{font-size:clamp(18px,3vw,28px);letter-spacing:0.06em}
+  .controls{display:flex;gap:10px;align-items:center}
+  button{background:var(--accent);border:none;padding:10px 14px;border-radius:10px;color:#052024;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+  button.secondary{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.06)}
+  #canvasWrap{flex:1; display:flex;border-radius:14px;overflow:hidden;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));box-shadow:inset 0 0 80px rgba(0,0,0,0.5)}
+  canvas{width:100%;height:100%;display:block}
+  .info{font-size:13px;color:var(--muted);opacity:0.9}
+  .legend{display:flex;gap:12px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .counts{position:absolute;right:18px;bottom:18px;background:var(--card-bg);padding:10px;border-radius:10px;font-size:13px;color:var(--muted)}
+  .footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+  .bigword{position:absolute;left:18px;bottom:18px;font-weight:800;color:rgba(125,211,252,0.06);font-size:180px;pointer-events:none;user-select:none}
+  @media (max-width:700px){
+    .bigword{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <div class="title">16 Days — Words of Respect (Realtime)</div>
+      <div class="info">Speak into the mic. Words will appear and grow with respect and frequency. Designed for big screens.</div>
+    </div>
+    <div class="controls">
+      <button id="btnStart">Start (mic)</button>
+      <button id="btnStop" class="secondary" disabled>Stop</button>
+      <button id="btnReset" class="secondary">Reset</button>
+    </div>
+  </header>
+
+  <div id="canvasWrap">
+    <canvas id="wc"></canvas>
+    <div class="bigword" id="bgWord">RESPECT</div>
+  </div>
+
+  <div class="footer">
+    <div class="legend">
+      <div class="dot" style="background:var(--accent)"></div>
+      <div>Realtime speech → AssemblyAI (streaming)</div>
+    </div>
+    <div class="info">Replace <code>YOUR_ASSEMBLYAI_API_KEY_HERE</code> in the source with your key. Run via localhost for mic access.</div>
+  </div>
+
+  <div class="counts" id="countsBox">Top words: —</div>
+</div>
+
+<script>
+/*
+  Single-file realtime word cloud with AssemblyAI streaming.
+  Replace API_KEY below with your AssemblyAI key.
+  Notes:
+  - Browsers require HTTPS or localhost for mic access.
+  - For local testing: run `python -m http.server` and open http://localhost:8000/realtime-wordcloud.html
+  - AssemblyAI Realtime websocket target: wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&authorization=API_KEY
+*/
+
+const ASSEMBLY_API_KEY = "960ec9d3474145a28fbffeb54b7cd550"; // <-- replace with your full key
+
+/* ---------- Word cloud engine ---------- */
+const canvas = document.getElementById('wc');
+const ctx = canvas.getContext('2d');
+let W = (canvas.width = canvas.clientWidth * devicePixelRatio);
+let H = (canvas.height = canvas.clientHeight * devicePixelRatio);
+ctx.scale(devicePixelRatio, devicePixelRatio);
+
+window.addEventListener('resize', () => {
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  W = canvas.width; H = canvas.height;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+});
+
+const state = {
+  words: new Map(), // word -> {count, x,y,tx,ty,scale,drift}
+  maxCount: 1,
+  particles: [], // for animated floats
+  lastTranscript: ''
+};
+
+const STOPWORDS = new Set([
+  "the","and","a","an","in","on","at","to","for","of","is","are","it","that","this","be","with","i","you","we","they","he","she","them","was","were","but","or","as","not","your","my","our","from","by","about","have","has","had"
+]);
+
+function normalizeWord(w){
+  return w.replace(/[^\p{L}\p{N}’'-]/gu,'').toLowerCase();
+}
+
+function feedText(text){
+  state.lastTranscript = text;
+  const tokens = text.split(/\s+/).map(normalizeWord).filter(Boolean);
+  for(const t of tokens){
+    if(t.length < 2) continue;
+    if(STOPWORDS.has(t)) continue;
+    // treat basic respectful synonyms mapping (optional)
+    const synonyms = {"survivor":"survivor","safety":"safety","respect":"respect","support":"support","care":"care","justice":"justice","dignity":"dignity","protect":"protect","listen":"listen","believe":"believe","heal":"heal"};
+    const key = synonyms[t] || t;
+    const entry = state.words.get(key) || {count:0, x: Math.random()*canvas.clientWidth, y: Math.random()*canvas.clientHeight, tx:0, ty:0, scale:1, drift: Math.random()*2-1};
+    entry.count++;
+    entry.tx = Math.random()*(canvas.clientWidth-200)+100;
+    entry.ty = Math.random()*(canvas.clientHeight-200)+100;
+    entry.drift = (Math.random()-0.5)*1.5;
+    state.words.set(key, entry);
+    if(entry.count > state.maxCount) state.maxCount = entry.count;
+  }
+}
+
+/* ---------- simple layout & animation ---------- */
+function draw(){
+  ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  // subtle background vignette
+  const g = ctx.createLinearGradient(0,0,0,canvas.clientHeight);
+  g.addColorStop(0, 'rgba(15,23,36,0.06)');
+  g.addColorStop(1, 'rgba(2,6,23,0.18)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+
+  // animate words
+  const entries = Array.from(state.words.entries()).sort((a,b) => b[1].count - a[1].count);
+  const nowTop = entries.slice(0,6).map(e=>e[0]);
+  document.getElementById('bgWord').textContent = (nowTop[0] || "RESPECT").toUpperCase();
+
+  let i=0;
+  for(const [w,entry] of entries){
+    // size mapping: base size 16 -> 120
+    const size = Math.max(16, Math.min(140, 16 + (entry.count / state.maxCount) * 124));
+    entry.scale += (size - entry.scale) * 0.12;
+    // move toward target with slight wandering
+    entry.x += (entry.tx - entry.x) * 0.06 + entry.drift*0.2;
+    entry.y += (entry.ty - entry.y) * 0.06 + Math.sin(Date.now()/1000 + i)*0.4;
+    ctx.save();
+    ctx.font = `700 ${Math.round(entry.scale)}px Inter, system-ui, sans-serif`;
+    // color gradient by prominence
+    const prominence = entry.count / state.maxCount;
+    const alpha = 0.35 + prominence * 0.85;
+    ctx.fillStyle = `rgba(125,211,252,${Math.min(1,alpha)})`;
+    // shadow
+    ctx.shadowColor = `rgba(0,0,0,0.5)`;
+    ctx.shadowBlur = 8;
+    const metrics = ctx.measureText(w);
+    const fx = entry.x - metrics.width/2;
+    const fy = entry.y + entry.scale/2.7;
+    ctx.fillText(w, fx, fy);
+    ctx.restore();
+    i++;
+  }
+
+  // counts box update
+  const top = entries.slice(0,6).map(e=>`${e[0]} (${e[1].count})`).join(' • ');
+  document.getElementById('countsBox').textContent = top || 'Top words: —';
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+/* ---------- AssemblyAI Realtime connection + audio capture ---------- */
+
+let ws = null;
+let audioContext = null;
+let processorNode = null;
+let sourceNode = null;
+let streamTrack = null;
+
+async function startStreaming(){
+  if(!ASSEMBLY_API_KEY || ASSEMBLY_API_KEY.includes('YOUR_')) {
+    alert('Please replace the placeholder key in the code with your AssemblyAI key before starting.');
+    return;
+  }
+
+  // WebSocket URL (AssemblyAI expects the key; we use query param here)
+  const sampleRate = 16000;
+  const url = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=${sampleRate}&authorization=${encodeURIComponent(ASSEMBLY_API_KEY)}`;
+
+  ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
+
+  ws.addEventListener('open', () => {
+    console.log('WS open — connected to AssemblyAI realtime');
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+  });
+
+  ws.addEventListener('message', (evt) => {
+    // assemblyai sends JSON messages for transcripts; sometimes nested
+    try{
+      const str = typeof evt.data === 'string' ? evt.data : new TextDecoder().decode(evt.data);
+      const json = JSON.parse(str);
+      // Best-effort parse for live transcripts
+      // structure may be {message: {text: "...", ...}} or various types; check keys
+      // We'll search for any 'text' fields
+      const extractText = (obj) => {
+        if(!obj) return null;
+        if(typeof obj.text === 'string' && obj.text.trim()) return obj.text;
+        // check suggestions/alternatives
+        if(Array.isArray(obj.alternatives) && obj.alternatives[0] && obj.alternatives[0].text) return obj.alternatives[0].text;
+        // nested
+        for(const k of Object.keys(obj)){
+          if(typeof obj[k] === 'object'){
+            const t = extractText(obj[k]);
+            if(t) return t;
+          }
+        }
+        return null;
+      };
+      const t = extractText(json);
+      if(t){
+        feedText(t);
+      } else {
+        // debug: console.log('WS msg', json);
+      }
+    }catch(e){
+      // ignore non-json messages
+      // console.log('WS raw', evt.data);
+    }
+  });
+
+  ws.addEventListener('close', () => {
+    console.log('WS closed');
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+  });
+
+  ws.addEventListener('error', (err) => {
+    console.error('WS error', err);
+    alert('Websocket error. Check the console.');
+  });
+
+  // audio capture & resample to 16k
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  // create a small buffer processing node using AudioWorklet if available, otherwise ScriptProcessor
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  streamTrack = stream.getTracks()[0];
+  sourceNode = audioContext.createMediaStreamSource(stream);
+
+  // Some browsers have different sample rates; we'll use an AudioWorklet to capture raw float32 frames
+  // Fallback: ScriptProcessor (deprecated) if AudioWorklet not supported
+  if(audioContext.audioWorklet){
+    const processorBlob = `
+      class RecorderProcessor extends AudioWorkletProcessor {
+        constructor(){ super(); }
+        process(inputs){
+          const input = inputs[0];
+          if (input && input[0]) {
+            const channelData = input[0];
+            // send raw Float32 to main thread
+            this.port.postMessage(channelData);
+          }
+          return true;
+        }
+      }
+      registerProcessor('recorder-processor', RecorderProcessor);
+    `;
+    const blobUrl = URL.createObjectURL(new Blob([processorBlob], {type:'application/javascript'}));
+    await audioContext.audioWorklet.addModule(blobUrl);
+    processorNode = new AudioWorkletNode(audioContext, 'recorder-processor');
+    processorNode.port.onmessage = (ev) => {
+      const float32Array = ev.data;
+      // resample from audioContext.sampleRate -> 16000 and send as Int16
+      const int16 = convertFloat32ToInt16(resampleBuffer(float32Array, audioContext.sampleRate, sampleRate));
+      if(ws && ws.readyState === WebSocket.OPEN){
+        ws.send(int16.buffer);
+      }
+    };
+    sourceNode.connect(processorNode);
+    processorNode.connect(audioContext.destination); // keep chain alive (silent)
+  } else {
+    // fallback using ScriptProcessorNode
+    const bufferSize = 2048;
+    processorNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
+    processorNode.onaudioprocess = function(e){
+      const float32Array = e.inputBuffer.getChannelData(0);
+      const int16 = convertFloat32ToInt16(resampleBuffer(float32Array, audioContext.sampleRate, sampleRate));
+      if(ws && ws.readyState === WebSocket.OPEN){
+        ws.send(int16.buffer);
+      }
+    };
+    sourceNode.connect(processorNode);
+    processorNode.connect(audioContext.destination);
+  }
+}
+
+/* ---------- helper: resample float32 to targetRate ---------- */
+function resampleBuffer(buffer, srcRate, dstRate){
+  if(srcRate === dstRate) {
+    return Float32Array.from(buffer);
+  }
+  const ratio = srcRate / dstRate;
+  const len = Math.round(buffer.length / ratio);
+  const out = new Float32Array(len);
+  let offset = 0;
+  for(let i=0;i<len;i++){
+    out[i] = buffer[Math.round(i * ratio)] || 0;
+  }
+  return out;
+}
+
+/* ---------- convert Float32Array to Int16Array (PCM 16) ---------- */
+function convertFloat32ToInt16(buffer){
+  const l = buffer.length;
+  const buf = new Int16Array(l);
+  for(let i=0;i<l;i++){
+    let s = Math.max(-1, Math.min(1, buffer[i]));
+    buf[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return buf;
+}
+
+/* ---------- stop streaming ---------- */
+function stopStreaming(){
+  if(processorNode){
+    try{ processorNode.disconnect(); }catch(e){}
+    try{ processorNode.port && processorNode.port.close(); }catch(e){}
+    processorNode = null;
+  }
+  if(sourceNode){ try{ sourceNode.disconnect(); }catch(e){} sourceNode=null; }
+  if(streamTrack){ streamTrack.stop(); streamTrack=null; }
+  if(audioContext){ try{ audioContext.close(); }catch(e){} audioContext=null; }
+  if(ws && ws.readyState === WebSocket.OPEN){ ws.close(1000, "user_stop"); }
+  ws = null;
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+}
+
+/* ---------- UI wiring ---------- */
+document.getElementById('btnStart').addEventListener('click', async () => {
+  try{
+    await startStreaming();
+  }catch(e){
+    console.error(e);
+    alert('Could not start audio streaming: ' + (e.message||e));
+  }
+});
+document.getElementById('btnStop').addEventListener('click', () => stopStreaming());
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.words.clear(); state.maxCount = 1;
+});
+
+/* ---------- small demo filler: pre-seed with respectful words ---------- */
+const seed = ["respect","safety","believe","support","care","protect","dignity","listen","justice","survivors","voice","heal","respect","empathy","candor","allyship"];
+seed.forEach(w => {
+  state.words.set(w, {count: Math.floor(Math.random()*3)+1, x: Math.random()*canvas.clientWidth, y: Math.random()*canvas.clientHeight, tx: Math.random()*canvas.clientWidth, ty: Math.random()*canvas.clientHeight, scale:16, drift:(Math.random()-0.5)*1.3});
+});
+state.maxCount = 4;
+
+/* ---------- quick keyboard shortcuts ---------- */
+window.addEventListener('keydown', (e) => {
+  if(e.key === ' '){ // space toggles start/stop
+    if(!ws) document.getElementById('btnStart').click();
+    else document.getElementById('btnStop').click();
+  } else if(e.key === 'r'){ document.getElementById('btnReset').click(); }
+});
+
+/* ---------- friendly note for debugging ---------- */
+console.log("Realtime word cloud loaded. Replace API key and run from localhost (or https).");
+</script>
+</body>
+</html>
